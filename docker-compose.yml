@@ -1,0 +1,46 @@
+version: "2.3"
+services:
+  users:
+    build:
+      context: .
+      dockerfile: ./docker/images/users/Dockerfile
+    image: practice-hooma-users:latest
+    expose:
+      - 3000
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      main: { }
+      db: { }
+    restart: "always"
+
+  db:
+    image: postgres:11.10
+    volumes:
+      - ${PG_DIR_DATA:-postgres-storage}:/var/lib/postgresql/data
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      db: { }
+    restart: "always"
+
+volumes:
+  postgres-storage: { }
+
+networks:
+  main:
+    name: main
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.111.0.0/29
+          gateway: 10.111.0.1
+
+  db:
+    name: db
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.111.0.8/29
+          gateway: 10.111.0.9
