@@ -67,4 +67,14 @@ export class UsersController {
 
     return {count: data};
   }
+
+  @GrpcMethod(USERS_SERVICE_NAME, 'Delete')
+  async delete(payload: FindOneQueryDto): Promise<UpdateAndDeleteResponse> {
+    const [error, data] = await this._usersService.delete(FindOneQueryDto.toModel(payload));
+    if (error) {
+      throw error;
+    }
+
+    return {count: data};
+  }
 }

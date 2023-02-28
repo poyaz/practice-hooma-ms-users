@@ -323,4 +323,45 @@ describe('UsersController', () => {
       expect(result).toMatchObject<UpdateAndDeleteResponse>({count: 1});
     });
   });
+
+  describe(`delete`, () => {
+    let payload: FindOneQueryDto;
+
+    beforeEach(() => {
+      payload = new FindOneQueryDto();
+      payload.userId = identifierMock.generateId();
+    });
+
+    it(`Should error delete user by id`, async () => {
+      usersService.delete.mockResolvedValue([new Error('fail')]);
+
+      let error;
+      try {
+        await controller.delete(payload);
+      } catch (err) {
+        error = err;
+      }
+
+      expect(usersService.delete).toHaveBeenCalled();
+      expect(usersService.delete).toHaveBeenCalledWith(identifierMock.generateId());
+      expect(error).toBeInstanceOf(Error);
+    });
+
+    it(`Should successfully delete user by id`, async () => {
+      usersService.delete.mockResolvedValue([null, 1]);
+
+      let error;
+      let result;
+      try {
+        result = await controller.delete(payload);
+      } catch (err) {
+        error = err;
+      }
+
+      expect(usersService.delete).toHaveBeenCalled();
+      expect(usersService.delete).toHaveBeenCalledWith(identifierMock.generateId());
+      expect(error).toBeUndefined();
+      expect(result).toMatchObject<UpdateAndDeleteResponse>({count: 1});
+    });
+  });
 });
