@@ -17,19 +17,32 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "proto:users": "protoc --plugin=./node_modules/.bin/protoc-gen-ts_proto -I=./node_modules/proto-users --ts_proto_out=./src/module/users/api/grpc/controller/users node_modules/proto-users/users.proto --ts_proto_opt=nestJs=true --ts_proto_opt=fileSuffix=.pb",
+    "migration:create": "./node_modules/.bin/typeorm migration:create",
+    "migration:run": "node dist/cli.js migration:run",
+    "migration:undo": "node dist/cli.js migration:undo"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.8.11",
     "@grpc/proto-loader": "^0.7.5",
     "@nestjs/common": "^9.0.0",
+    "@nestjs/config": "^2.3.1",
     "@nestjs/core": "^9.0.0",
+    "@nestjs/jwt": "^10.0.2",
     "@nestjs/microservices": "^9.3.9",
     "@nestjs/platform-express": "^9.0.0",
     "@nestjs/typeorm": "^9.0.1",
+    "lodash.clonedeep": "^4.5.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.0",
+    "moment": "^2.29.4",
+    "moment-timezone": "^0.5.34",
+    "nest-commander": "^3.5.0",
+    "nestjs-pino": "^3.1.2",
     "pg": "^8.9.0",
+    "pino-pretty": "^9.3.0",
+    "proto-users": "git+https://github.com/poyaz/practice-hooma-proto-users.git",
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.2.0",
     "typeorm": "^0.3.12"
@@ -70,10 +83,7 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "moduleNameMapper": {
-      "@src-api/(.*)": "<rootDir>/api/$1",
       "@src-loader/(.*)": "<rootDir>/loader/$1",
-      "@src-core/(.*)": "<rootDir>/core/$1",
-      "@src-infrastructure/(.*)": "<rootDir>/infrastructure/$1",
       "@src-utility/(.*)": "<rootDir>/utility/$1"
     },
     "collectCoverageFrom": [
