@@ -32,6 +32,7 @@ export interface FindOneResponse {
 export interface CreateRequest {
   username: string;
   password: string;
+  salt: string;
   role: string;
   name: string;
   age: number;
