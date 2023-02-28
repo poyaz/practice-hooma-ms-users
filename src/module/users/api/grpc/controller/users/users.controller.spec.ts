@@ -7,9 +7,11 @@ import {DateTimeInterface} from '../../../../core/interface/date-time.interface'
 import {FindAllQueryDto} from './dto/find-all-query.dto';
 import {UsersModel, UsersRoleEnum} from '../../../../core/model/users.model';
 import {IdentifierInterface} from '../../../../core/interface/identifier.interface';
-import {FindAllResponse, FindOneResponse} from './users.pb';
+import {FindAllResponse, FindOneResponse, UpdateAndDeleteResponse} from './users.pb';
 import {FindOneQueryDto} from './dto/find-one-query.dto';
 import {CreateInputDto} from './dto/create-input.dto';
+import {UpdateInputDto} from './dto/update-input.dto';
+import {UpdateModel} from '@src-utility/model/update.model';
 
 describe('UsersController', () => {
   let controller: UsersController;
@@ -270,6 +272,55 @@ describe('UsersController', () => {
         createAt: defaultDateTimeStr,
         updateAt: defaultDateTimeStr,
       });
+    });
+  });
+
+  describe(`update`, () => {
+    let payload: UpdateInputDto;
+    let matchUpdateUser: UpdateModel<UsersModel>;
+
+    beforeEach(() => {
+      payload = new UpdateInputDto();
+      payload.userId = identifierMock.generateId();
+      payload.password = 'new-password';
+      payload.name = 'new-name';
+
+      matchUpdateUser = new UpdateModel<UsersModel>(payload.userId, {
+        password: payload.password,
+        name: payload.name,
+      });
+    });
+
+    it(`Should error update user by id`, async () => {
+      usersService.update.mockResolvedValue([new Error('fail')]);
+
+      let error;
+      try {
+        await controller.update(payload);
+      } catch (err) {
+        error = err;
+      }
+
+      expect(usersService.update).toHaveBeenCalled();
+      expect(usersService.update).toHaveBeenCalledWith(matchUpdateUser);
+      expect(error).toBeInstanceOf(Error);
+    });
+
+    it(`Should successfully update user by id`, async () => {
+      usersService.update.mockResolvedValue([null, 1]);
+
+      let error;
+      let result;
+      try {
+        result = await controller.update(payload);
+      } catch (err) {
+        error = err;
+      }
+
+      expect(usersService.update).toHaveBeenCalled();
+      expect(usersService.update).toHaveBeenCalledWith(matchUpdateUser);
+      expect(error).toBeUndefined();
+      expect(result).toMatchObject<UpdateAndDeleteResponse>({count: 1});
     });
   });
 });

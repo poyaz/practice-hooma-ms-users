@@ -2,13 +2,21 @@ import {Controller, Inject} from '@nestjs/common';
 import {ProviderEnum} from '../../../enum/provider.enum';
 import {UsersServiceInterface} from '../../../../core/interface/users-service.interface';
 import {GrpcMethod} from '@nestjs/microservices';
-import {CreateRequest, FindAllRequest, FindAllResponse, FindOneResponse, USERS_SERVICE_NAME} from './users.pb';
+import {
+  CreateRequest,
+  FindAllRequest,
+  FindAllResponse,
+  FindOneResponse,
+  UpdateAndDeleteResponse,
+  USERS_SERVICE_NAME,
+} from './users.pb';
 import {FindAllQueryDto} from './dto/find-all-query.dto';
 import {FindAllOutputDto} from './dto/find-all-output.dto';
 import {DateTimeInterface} from '../../../../core/interface/date-time.interface';
 import {FindOneQueryDto} from './dto/find-one-query.dto';
 import {FindOneOutputDto} from './dto/find-one-output.dto';
 import {CreateInputDto} from './dto/create-input.dto';
+import {UpdateInputDto} from './dto/update-input.dto';
 
 @Controller()
 export class UsersController {
@@ -48,5 +56,15 @@ export class UsersController {
     }
 
     return FindOneOutputDto.toObj(data, this._dateTime);
+  }
+
+  @GrpcMethod(USERS_SERVICE_NAME, 'Update')
+  async update(payload: UpdateInputDto): Promise<UpdateAndDeleteResponse> {
+    const [error, data] = await this._usersService.update(UpdateInputDto.toModel(payload));
+    if (error) {
+      throw error;
+    }
+
+    return {count: data};
   }
 }
