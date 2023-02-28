@@ -1,0 +1,4 @@
+export enum ExceptionEnum {
+  NOT_FOUND_ERROR = 'NOT_FOUND_ERROR',
+  REPOSITORY_ERROR = 'REPOSITORY_ERROR',
+}
