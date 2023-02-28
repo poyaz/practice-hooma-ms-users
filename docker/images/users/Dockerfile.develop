@@ -1,6 +1,6 @@
 FROM node:18-alpine3.16
 
-RUN apk add --no-cache curl su-exec bash protoc
+RUN apk add --no-cache curl su-exec bash protoc git
 
 COPY ./docker/images/users/docker-entrypoint.sh /usr/local/bin/
 
