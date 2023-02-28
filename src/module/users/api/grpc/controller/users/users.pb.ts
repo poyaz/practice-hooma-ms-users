@@ -50,7 +50,7 @@ export interface DeleteRequest {
 }
 
 export interface UpdateAndDeleteResponse {
-  count: string;
+  count: number;
 }
 
 export const USERS_PACKAGE_NAME = "users";
