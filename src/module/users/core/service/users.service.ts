@@ -55,6 +55,11 @@ export class UsersService implements UsersServiceInterface {
   }
 
   async delete(id: string): AsyncReturn<Error, number> {
-    return Promise.resolve(undefined);
+    const [userError, userData] = await this.getById(id);
+    if (userError) {
+      return [userError];
+    }
+
+    return this._usersRepository.delete(id);
   }
 }

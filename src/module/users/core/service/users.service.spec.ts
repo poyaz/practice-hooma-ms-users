@@ -327,4 +327,62 @@ describe('UsersService', () => {
       expect(result).toEqual(1);
     })
   })
+
+  describe(`delete`, () => {
+    let inputId: string;
+    let getByIdMock;
+    let outputUsers: UsersModel;
+
+    beforeEach(() => {
+      inputId = identifierMock.generateId();
+
+      getByIdMock = service.getById = jest.fn();
+
+      outputUsers = UsersModel.getDefaultModel();
+    })
+
+    afterEach(() => {
+      getByIdMock.mockClear();
+    })
+
+    it(`Should error delete user when get user by id`, async () => {
+      getByIdMock.mockResolvedValue([new NotFoundException()]);
+
+      const [error] = await service.delete(inputId);
+
+      expect(getByIdMock).toHaveBeenCalled();
+      expect(getByIdMock).toHaveBeenCalledWith(inputId);
+      expect(error).toBeInstanceOf(NotFoundException);
+    })
+
+    it(`Should error delete user when delete user by id`, async () => {
+      getByIdMock.mockResolvedValue([null, outputUsers]);
+      const executeError = new Error('error');
+      usersRepository.delete.mockResolvedValue([new RepositoryException(executeError)]);
+
+      const [error] = await service.delete(inputId);
+
+      expect(getByIdMock).toHaveBeenCalled();
+      expect(getByIdMock).toHaveBeenCalledWith(inputId);
+      expect(usersRepository.delete).toHaveBeenCalled();
+      expect(usersRepository.delete).toHaveBeenCalledWith(inputId);
+      expect(error).toBeInstanceOf(RepositoryException);
+      expect((<RepositoryException>error).cause).toEqual(executeError);
+    })
+
+    it(`Should successfully delete user when delete user by id`, async () => {
+      getByIdMock.mockResolvedValue([null, outputUsers]);
+      const executeError = new Error('error');
+      usersRepository.delete.mockResolvedValue([null, 1]);
+
+      const [error, result] = await service.delete(inputId);
+
+      expect(getByIdMock).toHaveBeenCalled();
+      expect(getByIdMock).toHaveBeenCalledWith(inputId);
+      expect(usersRepository.delete).toHaveBeenCalled();
+      expect(usersRepository.delete).toHaveBeenCalledWith(inputId);
+      expect(error).toBeNull();
+      expect(result).toEqual(1);
+    })
+  })
 });
