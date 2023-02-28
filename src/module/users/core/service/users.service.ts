@@ -31,7 +31,13 @@ export class UsersService implements UsersServiceInterface {
   }
 
   async create(model: UsersModel): AsyncReturn<Error, UsersModel> {
-    return Promise.resolve(undefined);
+    const passwordSalt = await bcrypt.genSalt(10);
+
+    const createModel = model.clone();
+    createModel.password = await bcrypt.hash(model.password, passwordSalt);
+    createModel.salt = passwordSalt;
+
+    return this._usersRepository.create(createModel);
   }
 
   async update(model: UpdateModel<UsersModel>): AsyncReturn<Error, number> {

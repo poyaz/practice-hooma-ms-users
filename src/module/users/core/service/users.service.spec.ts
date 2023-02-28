@@ -7,6 +7,9 @@ import {IdentifierInterface} from '../interface/identifier.interface';
 import {RepositoryException} from '../exception/repository.exception';
 import {NotFoundException} from '../exception/not-found.exception';
 
+jest.mock('bcrypt');
+import * as bcrypt from 'bcrypt';
+
 describe('UsersService', () => {
   let service: UsersService;
   let usersRepository: MockProxy<GenericRepositoryInterface<UsersModel>>;
@@ -151,4 +154,87 @@ describe('UsersService', () => {
       expect(result).toEqual(outputUsers);
     });
   });
+
+  describe(`create`, () => {
+    let inputModel: UsersModel;
+    let outputUsers: UsersModel;
+    let passwordSalt: string;
+    let passwordHash: string;
+
+    beforeEach(() => {
+      inputModel = UsersModel.getDefaultModel();
+      inputModel.username = 'username';
+      inputModel.password = 'password';
+      inputModel.role = UsersRoleEnum.USER;
+      inputModel.name = 'name';
+      inputModel.age = 20;
+
+      passwordSalt = 'random-salt';
+      passwordHash = 'password-hash';
+
+      outputUsers = new UsersModel({
+        id: identifierMock.generateId(),
+        username: inputModel.username,
+        password: passwordHash,
+        salt: passwordSalt,
+        role: inputModel.role,
+        name: inputModel.name,
+        age: inputModel.age,
+        createAt: defaultDate,
+      });
+    });
+
+    it(`Should error create new users`, async () => {
+      (<jest.Mock>bcrypt.genSalt).mockResolvedValue(passwordSalt);
+      (<jest.Mock>bcrypt.hash).mockResolvedValue(passwordHash);
+      const executeError = new Error('error');
+      usersRepository.create.mockResolvedValue([new RepositoryException(executeError)]);
+
+      const [error] = await service.create(inputModel);
+
+      expect(bcrypt.genSalt).toHaveBeenCalled();
+      expect(bcrypt.genSalt).toHaveBeenCalledWith(10);
+      expect(bcrypt.hash).toHaveBeenCalled();
+      expect(bcrypt.hash).toHaveBeenCalledWith(inputModel.password, passwordSalt);
+      expect(usersRepository.create).toHaveBeenCalled();
+      expect(usersRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining<Pick<UsersModel, 'username' | 'password' | 'salt' | 'role' | 'name' | 'age'>>({
+          username: inputModel.username,
+          password: passwordHash,
+          salt: passwordSalt,
+          role: inputModel.role,
+          name: inputModel.name,
+          age: inputModel.age,
+        })
+      );
+      expect(error).toBeInstanceOf(RepositoryException);
+      expect((<RepositoryException>error).cause).toEqual(executeError);
+    })
+
+    it(`Should successfully create new users`, async () => {
+      (<jest.Mock>bcrypt.genSalt).mockResolvedValue(passwordSalt);
+      (<jest.Mock>bcrypt.hash).mockResolvedValue(passwordHash);
+      usersRepository.create.mockResolvedValue([null, outputUsers]);
+
+      const [error, result] = await service.create(inputModel);
+
+      expect(bcrypt.genSalt).toHaveBeenCalled();
+      expect(bcrypt.genSalt).toHaveBeenCalledWith(10);
+      expect(bcrypt.hash).toHaveBeenCalled();
+      expect(bcrypt.hash).toHaveBeenCalledWith(inputModel.password, passwordSalt);
+      expect(usersRepository.create).toHaveBeenCalled();
+      expect(usersRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining<Pick<UsersModel, 'username' | 'password' | 'salt' | 'role' | 'name' | 'age'>>({
+          username: inputModel.username,
+          password: passwordHash,
+          salt: passwordSalt,
+          role: inputModel.role,
+          name: inputModel.name,
+          age: inputModel.age,
+        })
+      );
+      expect(error).toBeNull();
+      expect(result).toEqual(outputUsers);
+    })
+  })
 });
