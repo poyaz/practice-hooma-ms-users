@@ -41,7 +41,17 @@ export class UsersService implements UsersServiceInterface {
   }
 
   async update(model: UpdateModel<UsersModel>): AsyncReturn<Error, number> {
-    return Promise.resolve(undefined);
+    const [userError, userData] = await this.getById(model.id);
+    if (userError) {
+      return [userError];
+    }
+
+    const updateModel = model.getModel();
+    if (updateModel.password) {
+      updateModel.password = await bcrypt.hash(updateModel.password, userData.salt);
+    }
+
+    return this._usersRepository.update(model);
   }
 
   async delete(id: string): AsyncReturn<Error, number> {

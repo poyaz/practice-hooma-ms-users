@@ -6,6 +6,7 @@ import {UsersModel, UsersRoleEnum} from '../model/users.model';
 import {IdentifierInterface} from '../interface/identifier.interface';
 import {RepositoryException} from '../exception/repository.exception';
 import {NotFoundException} from '../exception/not-found.exception';
+import {UpdateModel} from '@src-utility/model/update.model';
 
 jest.mock('bcrypt');
 import * as bcrypt from 'bcrypt';
@@ -235,6 +236,95 @@ describe('UsersService', () => {
       );
       expect(error).toBeNull();
       expect(result).toEqual(outputUsers);
+    })
+  })
+
+  describe(`update`, () => {
+    let inputId: string;
+    let inputPassword: string;
+    let inputModel: UpdateModel<UsersModel>;
+    let getByIdMock;
+    let outputUsers: UsersModel;
+    let passwordHash: string;
+    let matchUpdateModel: UpdateModel<UsersModel>;
+
+    beforeEach(() => {
+      inputId = identifierMock.generateId();
+      inputPassword = 'new-password';
+      inputModel = new UpdateModel<UsersModel>(inputId, {
+        password: inputPassword,
+        age: 21,
+      });
+
+      getByIdMock = service.getById = jest.fn();
+
+      outputUsers = new UsersModel({
+        id: identifierMock.generateId(),
+        username: 'username',
+        password: 'password-hash',
+        salt: 'random-salt',
+        role: UsersRoleEnum.USER,
+        name: 'name',
+        age: 20,
+        createAt: defaultDate,
+      });
+
+      passwordHash = 'new-password-hash';
+
+      matchUpdateModel = new UpdateModel<UsersModel>(inputId, {
+        password: passwordHash,
+        age: 21,
+      });
+    })
+
+    afterEach(() => {
+      getByIdMock.mockClear();
+    })
+
+    it(`Should error update user when get user by id`, async () => {
+      getByIdMock.mockResolvedValue([new NotFoundException()]);
+
+      const [error] = await service.update(inputModel);
+
+      expect(getByIdMock).toHaveBeenCalled();
+      expect(getByIdMock).toHaveBeenCalledWith(inputModel.id);
+      expect(error).toBeInstanceOf(NotFoundException);
+    })
+
+    it(`Should error update user when update by id`, async () => {
+      getByIdMock.mockResolvedValue([null, outputUsers]);
+      (<jest.Mock>bcrypt.hash).mockResolvedValue(passwordHash);
+      const executeError = new Error('error');
+      usersRepository.update.mockResolvedValue([new RepositoryException(executeError)]);
+
+      const [error] = await service.update(inputModel);
+
+      expect(getByIdMock).toHaveBeenCalled();
+      expect(getByIdMock).toHaveBeenCalledWith(inputModel.id);
+      expect(bcrypt.hash).toHaveBeenCalled();
+      expect(bcrypt.hash).toHaveBeenCalledWith(inputPassword, outputUsers.salt);
+      expect(usersRepository.update).toHaveBeenCalled();
+      expect(usersRepository.update).toHaveBeenCalledWith(matchUpdateModel);
+      expect(error).toBeInstanceOf(RepositoryException);
+      expect((<RepositoryException>error).cause).toEqual(executeError);
+    })
+
+    it(`Should successfully update user when update by id`, async () => {
+      getByIdMock.mockResolvedValue([null, outputUsers]);
+      (<jest.Mock>bcrypt.hash).mockResolvedValue(passwordHash);
+      const executeError = new Error('error');
+      usersRepository.update.mockResolvedValue([null, 1]);
+
+      const [error, result] = await service.update(inputModel);
+
+      expect(getByIdMock).toHaveBeenCalled();
+      expect(getByIdMock).toHaveBeenCalledWith(inputModel.id);
+      expect(bcrypt.hash).toHaveBeenCalled();
+      expect(bcrypt.hash).toHaveBeenCalledWith(inputPassword, outputUsers.salt);
+      expect(usersRepository.update).toHaveBeenCalled();
+      expect(usersRepository.update).toHaveBeenCalledWith(matchUpdateModel);
+      expect(error).toBeNull();
+      expect(result).toEqual(1);
     })
   })
 });
