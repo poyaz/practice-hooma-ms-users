@@ -7,7 +7,9 @@ import {DateTimeInterface} from '../../../../core/interface/date-time.interface'
 import {FindAllQueryDto} from './dto/find-all-query.dto';
 import {UsersModel, UsersRoleEnum} from '../../../../core/model/users.model';
 import {IdentifierInterface} from '../../../../core/interface/identifier.interface';
-import {FindAllResponse} from './users.pb';
+import {FindAllResponse, FindOneResponse} from './users.pb';
+import {FindOneOutputDto} from './dto/find-one-output.dto';
+import {FindOneQueryDto} from './dto/find-one-query.dto';
 
 describe('UsersController', () => {
   let controller: UsersController;
@@ -115,6 +117,69 @@ describe('UsersController', () => {
             updateAt: defaultDateTimeStr,
           },
         ],
+      });
+    });
+  });
+
+  describe(`findOne`, () => {
+    let payload: FindOneQueryDto;
+    let outputUsers: UsersModel;
+
+    beforeEach(() => {
+      payload = new FindOneQueryDto();
+      payload.userId = identifierMock.generateId();
+
+      outputUsers = new UsersModel({
+        id: identifierMock.generateId(),
+        username: 'username',
+        password: 'password',
+        salt: 'salt',
+        role: UsersRoleEnum.USER,
+        name: 'name',
+        age: 20,
+        createAt: defaultDate,
+      });
+    });
+
+    it(`Should error find one user`, async () => {
+      usersService.getById.mockResolvedValue([new Error('fail')]);
+
+      let error;
+      try {
+        await controller.findOne(payload);
+      } catch (err) {
+        error = err;
+      }
+
+      expect(usersService.getById).toHaveBeenCalled();
+      expect(usersService.getById).toHaveBeenCalledWith(identifierMock.generateId());
+      expect(error).toBeInstanceOf(Error);
+    });
+
+    it(`Should successfully find one user`, async () => {
+      usersService.getById.mockResolvedValue([null, outputUsers]);
+      dateTime.gregorianWithTimezoneString.mockReturnValue(defaultDateTimeStr);
+
+      let error;
+      let result;
+      try {
+        result = await controller.findOne(payload);
+      } catch (err) {
+        error = err;
+      }
+
+      expect(usersService.getById).toHaveBeenCalled();
+      expect(usersService.getById).toHaveBeenCalledWith(identifierMock.generateId());
+      expect(dateTime.gregorianWithTimezoneString).toHaveBeenCalledTimes(2);
+      expect(error).toBeUndefined();
+      expect(result).toMatchObject<FindOneResponse>({
+        id: outputUsers.id,
+        username: outputUsers.username,
+        role: outputUsers.role,
+        name: outputUsers.name,
+        age: outputUsers.age,
+        createAt: defaultDateTimeStr,
+        updateAt: defaultDateTimeStr,
       });
     });
   });
