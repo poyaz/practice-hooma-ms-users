@@ -5,6 +5,7 @@ import {GenericRepositoryInterface} from '../interface/generic-repository.interf
 import {UsersModel, UsersRoleEnum} from '../model/users.model';
 import {IdentifierInterface} from '../interface/identifier.interface';
 import {RepositoryException} from '../exception/repository.exception';
+import {NotFoundException} from '../exception/not-found.exception';
 
 describe('UsersService', () => {
   let service: UsersService;
@@ -69,6 +70,7 @@ describe('UsersService', () => {
 
       const [error] = await service.getAll();
 
+      expect(usersRepository.getAll).toHaveBeenCalled();
       expect(error).toBeInstanceOf(RepositoryException);
       expect((<RepositoryException>error).cause).toEqual(executeError);
     });
@@ -78,6 +80,7 @@ describe('UsersService', () => {
 
       const [error, result, total] = await service.getAll();
 
+      expect(usersRepository.getAll).toHaveBeenCalled();
       expect(error).toBeNull();
       expect(total).toEqual(0);
       expect(result).toHaveLength(0);
@@ -88,10 +91,64 @@ describe('UsersService', () => {
 
       const [error, result, total] = await service.getAll();
 
+      expect(usersRepository.getAll).toHaveBeenCalled();
       expect(error).toBeNull();
       expect(total).toEqual(1);
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual(outputUsers1);
+    });
+  });
+
+  describe(`getById`, () => {
+    let inputId: string;
+    let outputUsers: UsersModel;
+
+    beforeEach(() => {
+      inputId = identifierMock.generateId();
+
+      outputUsers = new UsersModel({
+        id: identifierMock.generateId(),
+        username: 'username',
+        password: 'password',
+        salt: 'salt',
+        role: UsersRoleEnum.USER,
+        name: 'name',
+        age: 20,
+        createAt: defaultDate,
+      });
+    });
+
+    it(`Should error get user by id`, async () => {
+      const executeError = new Error('error');
+      usersRepository.getById.mockResolvedValue([new RepositoryException(executeError)]);
+
+      const [error] = await service.getById(inputId);
+
+      expect(usersRepository.getById).toHaveBeenCalled();
+      expect(usersRepository.getById).toHaveBeenCalledWith(inputId);
+      expect(error).toBeInstanceOf(RepositoryException);
+      expect((<RepositoryException>error).cause).toEqual(executeError);
+    });
+
+    it(`Should error get user by id when user not found`, async () => {
+      usersRepository.getById.mockResolvedValue([null, null]);
+
+      const [error] = await service.getById(inputId);
+
+      expect(usersRepository.getById).toHaveBeenCalled();
+      expect(usersRepository.getById).toHaveBeenCalledWith(inputId);
+      expect(error).toBeInstanceOf(NotFoundException);
+    });
+
+    it(`Should successfully get user by id`, async () => {
+      usersRepository.getById.mockResolvedValue([null, outputUsers]);
+
+      const [error, result] = await service.getById(inputId);
+
+      expect(usersRepository.getById).toHaveBeenCalled();
+      expect(usersRepository.getById).toHaveBeenCalledWith(inputId);
+      expect(error).toBeNull();
+      expect(result).toEqual(outputUsers);
     });
   });
 });

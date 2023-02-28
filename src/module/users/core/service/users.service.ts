@@ -5,6 +5,7 @@ import {UsersModel} from '../model/users.model';
 import {GenericRepositoryInterface} from '../interface/generic-repository.interface';
 import * as bcrypt from 'bcrypt';
 import {UpdateModel} from '@src-utility/model/update.model';
+import {NotFoundException} from '../exception/not-found.exception';
 
 @Injectable()
 export class UsersService implements UsersServiceInterface {
@@ -18,7 +19,15 @@ export class UsersService implements UsersServiceInterface {
   }
 
   async getById(id: string): AsyncReturn<Error, UsersModel> {
-    return Promise.resolve(undefined);
+    const [error, data] = await this._usersRepository.getById(id);
+    if (error) {
+      return [error];
+    }
+    if (!data) {
+      return [new NotFoundException()];
+    }
+
+    return [null, data];
   }
 
   async create(model: UsersModel): AsyncReturn<Error, UsersModel> {
