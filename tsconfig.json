@@ -19,17 +19,8 @@
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false,
     "paths": {
-      "@src-api/*": [
-        "src/api/*"
-      ],
       "@src-loader/*": [
         "src/loader/*"
-      ],
-      "@src-core/*": [
-        "src/core/*"
-      ],
-      "@src-infrastructure/*": [
-        "src/infrastructure/*"
       ],
       "@src-utility/*": [
         "src/utility/*"
