@@ -8,8 +8,8 @@ import {FindAllQueryDto} from './dto/find-all-query.dto';
 import {UsersModel, UsersRoleEnum} from '../../../../core/model/users.model';
 import {IdentifierInterface} from '../../../../core/interface/identifier.interface';
 import {FindAllResponse, FindOneResponse} from './users.pb';
-import {FindOneOutputDto} from './dto/find-one-output.dto';
 import {FindOneQueryDto} from './dto/find-one-query.dto';
+import {CreateInputDto} from './dto/create-input.dto';
 
 describe('UsersController', () => {
   let controller: UsersController;
@@ -45,6 +45,8 @@ describe('UsersController', () => {
     }).compile();
 
     controller = module.get<UsersController>(UsersController);
+
+    jest.useFakeTimers().setSystemTime(defaultDate);
   });
 
   afterEach(() => {
@@ -170,6 +172,93 @@ describe('UsersController', () => {
 
       expect(usersService.getById).toHaveBeenCalled();
       expect(usersService.getById).toHaveBeenCalledWith(identifierMock.generateId());
+      expect(dateTime.gregorianWithTimezoneString).toHaveBeenCalledTimes(2);
+      expect(error).toBeUndefined();
+      expect(result).toMatchObject<FindOneResponse>({
+        id: outputUsers.id,
+        username: outputUsers.username,
+        role: outputUsers.role,
+        name: outputUsers.name,
+        age: outputUsers.age,
+        createAt: defaultDateTimeStr,
+        updateAt: defaultDateTimeStr,
+      });
+    });
+  });
+
+  describe(`create`, () => {
+    let payload: CreateInputDto;
+    let matchUsers: UsersModel;
+    let outputUsers: UsersModel;
+
+    beforeEach(() => {
+      payload = new CreateInputDto();
+      payload.username = 'username';
+      payload.password = 'password';
+      payload.role = UsersRoleEnum.USER;
+      payload.name = 'name';
+      payload.age = 20;
+
+      matchUsers = UsersModel.getDefaultModel();
+      matchUsers.username = payload.username;
+      matchUsers.password = payload.password;
+      matchUsers.role = payload.role;
+      matchUsers.name = payload.name;
+      matchUsers.age = payload.age;
+
+      outputUsers = new UsersModel({
+        id: identifierMock.generateId(),
+        username: payload.username,
+        password: payload.password,
+        salt: 'salt',
+        role: payload.role,
+        name: payload.name,
+        age: payload.age,
+        createAt: defaultDate,
+      });
+    });
+
+    it(`Should error create user`, async () => {
+      usersService.create.mockResolvedValue([new Error('fail')]);
+
+      let error;
+      try {
+        await controller.create(payload);
+      } catch (err) {
+        error = err;
+      }
+
+      expect(usersService.create).toHaveBeenCalled();
+      expect(usersService.create).toHaveBeenCalledWith(expect.objectContaining<Pick<UsersModel, 'username' | 'password' | 'role' | 'name' | 'age'>>({
+        username: payload.username,
+        password: payload.password,
+        role: payload.role,
+        name: payload.name,
+        age: payload.age,
+      }));
+      expect(error).toBeInstanceOf(Error);
+    });
+
+    it(`Should successfully create user`, async () => {
+      usersService.create.mockResolvedValue([null, outputUsers]);
+      dateTime.gregorianWithTimezoneString.mockReturnValue(defaultDateTimeStr);
+
+      let error;
+      let result;
+      try {
+        result = await controller.create(payload);
+      } catch (err) {
+        error = err;
+      }
+
+      expect(usersService.create).toHaveBeenCalled();
+      expect(usersService.create).toHaveBeenCalledWith(expect.objectContaining<Pick<UsersModel, 'username' | 'password' | 'role' | 'name' | 'age'>>({
+        username: payload.username,
+        password: payload.password,
+        role: payload.role,
+        name: payload.name,
+        age: payload.age,
+      }));
       expect(dateTime.gregorianWithTimezoneString).toHaveBeenCalledTimes(2);
       expect(error).toBeUndefined();
       expect(result).toMatchObject<FindOneResponse>({

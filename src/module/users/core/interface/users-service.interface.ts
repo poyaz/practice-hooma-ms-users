@@ -7,6 +7,8 @@ export interface UsersServiceInterface {
 
   getById(id: string): AsyncReturn<Error, UsersModel>;
 
+  create(model: UsersModel): AsyncReturn<Error, UsersModel>;
+
   update(model: UpdateModel<UsersModel>): AsyncReturn<Error, number>;
 
   delete(id: string): AsyncReturn<Error, number>;
