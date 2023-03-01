@@ -13,6 +13,7 @@ import {DefaultPropertiesSymbol, IsDefaultSymbol} from '@src-utility/model/symbo
 import {QueryRunner} from 'typeorm/query-runner/QueryRunner';
 import {EntityManager} from 'typeorm/entity-manager/EntityManager';
 import {UpdateModel} from '@src-utility/model/update.model';
+import {DeleteReadonlyResourceException} from '../../core/exception/delete-readonly-resource.exception';
 
 describe('UsersPgRepository', () => {
   let repository: UsersPgRepository;
@@ -503,7 +504,7 @@ describe('UsersPgRepository', () => {
       authDb.findOneBy.mockResolvedValue(outputAuthEntity);
       usersDb.findOneBy.mockResolvedValue(outputUsersEntity);
       dataSource.createQueryRunner.mockReturnValue(queryRunner);
-      queryRunner.connect.mockReturnValue(null);
+      queryRunner.connect.mockResolvedValue(null);
       const executeError = new Error('transaction');
       queryRunner.startTransaction.mockRejectedValue(executeError);
 
@@ -526,8 +527,8 @@ describe('UsersPgRepository', () => {
       authDb.findOneBy.mockResolvedValue(outputAuthEntity);
       usersDb.findOneBy.mockResolvedValue(outputUsersEntity);
       dataSource.createQueryRunner.mockReturnValue(queryRunner);
-      queryRunner.connect.mockReturnValue(null);
-      queryRunner.startTransaction.mockReturnValue(null);
+      queryRunner.connect.mockResolvedValue(null);
+      queryRunner.startTransaction.mockResolvedValue(null);
       const executeError = new Error('update auth');
       (manager.save).mockRejectedValueOnce(executeError);
       queryRunner.rollbackTransaction.mockResolvedValue(null);
@@ -552,8 +553,8 @@ describe('UsersPgRepository', () => {
       authDb.findOneBy.mockResolvedValue(outputAuthEntity);
       usersDb.findOneBy.mockResolvedValue(outputUsersEntity);
       dataSource.createQueryRunner.mockReturnValue(queryRunner);
-      queryRunner.connect.mockReturnValue(null);
-      queryRunner.startTransaction.mockReturnValue(null);
+      queryRunner.connect.mockResolvedValue(null);
+      queryRunner.startTransaction.mockResolvedValue(null);
       const executeError = new Error('update auth');
       (manager.save).mockRejectedValueOnce(executeError);
       const rollbackError = new Error('rollback');
@@ -581,8 +582,8 @@ describe('UsersPgRepository', () => {
       authDb.findOneBy.mockResolvedValue(outputAuthEntity);
       usersDb.findOneBy.mockResolvedValue(outputUsersEntity);
       dataSource.createQueryRunner.mockReturnValue(queryRunner);
-      queryRunner.connect.mockReturnValue(null);
-      queryRunner.startTransaction.mockReturnValue(null);
+      queryRunner.connect.mockResolvedValue(null);
+      queryRunner.startTransaction.mockResolvedValue(null);
       const executeError = new Error('update users');
       (manager.save).mockResolvedValueOnce(null).mockRejectedValueOnce(executeError);
       queryRunner.rollbackTransaction.mockResolvedValue(null);
@@ -607,8 +608,8 @@ describe('UsersPgRepository', () => {
       authDb.findOneBy.mockResolvedValue(outputAuthEntity);
       usersDb.findOneBy.mockResolvedValue(outputUsersEntity);
       dataSource.createQueryRunner.mockReturnValue(queryRunner);
-      queryRunner.connect.mockReturnValue(null);
-      queryRunner.startTransaction.mockReturnValue(null);
+      queryRunner.connect.mockResolvedValue(null);
+      queryRunner.startTransaction.mockResolvedValue(null);
       const executeError = new Error('update users');
       (manager.save).mockResolvedValueOnce(null).mockRejectedValueOnce(executeError);
       const rollbackError = new Error('rollback');
@@ -636,8 +637,8 @@ describe('UsersPgRepository', () => {
       authDb.findOneBy.mockResolvedValue(outputAuthEntity);
       usersDb.findOneBy.mockResolvedValue(outputUsersEntity);
       dataSource.createQueryRunner.mockReturnValue(queryRunner);
-      queryRunner.connect.mockReturnValue(null);
-      queryRunner.startTransaction.mockReturnValue(null);
+      queryRunner.connect.mockResolvedValue(null);
+      queryRunner.startTransaction.mockResolvedValue(null);
       (manager.save).mockResolvedValueOnce(null).mockResolvedValueOnce(null);
       queryRunner.commitTransaction.mockResolvedValue(null);
 
@@ -652,6 +653,268 @@ describe('UsersPgRepository', () => {
       expect(queryRunner.startTransaction).toHaveBeenCalled();
       expect(queryRunner.manager.save).toHaveBeenCalledTimes(2);
       expect(queryRunner.commitTransaction).toHaveBeenCalledTimes(1);
+      expect(queryRunner.release).toHaveBeenCalledTimes(1);
+      expect(error).toBeNull();
+      expect(result).toEqual(1);
+    });
+  });
+
+  describe(`delete`, () => {
+    let inputId: string;
+    let outputAdminAuthEntity: AuthEntity;
+    let outputAdminUsersEntity: UsersEntity;
+    let outputAuthEntity: AuthEntity;
+    let outputUsersEntity: UsersEntity;
+
+    beforeEach(() => {
+      inputId = identifier.generateId();
+
+      outputAdminAuthEntity = new AuthEntity();
+      outputAdminAuthEntity.username = 'admin';
+      outputAdminAuthEntity.password = 'password';
+      outputAdminAuthEntity.salt = 'salt';
+      outputAdminAuthEntity.role = UsersRoleEnum.ADMIN;
+      outputAdminAuthEntity.createAt = defaultDate;
+
+      outputAdminUsersEntity = new UsersEntity();
+      outputAdminUsersEntity.id = identifier.generateId();
+      outputAdminUsersEntity.name = 'admin';
+      outputAdminUsersEntity.age = 20;
+      outputAdminUsersEntity.createAt = defaultDate;
+      outputAdminUsersEntity.updateAt = null;
+
+      outputAuthEntity = new AuthEntity();
+      outputAuthEntity.username = 'username';
+      outputAuthEntity.password = 'password';
+      outputAuthEntity.salt = 'salt';
+      outputAuthEntity.role = UsersRoleEnum.USER;
+      outputAuthEntity.createAt = defaultDate;
+
+      outputUsersEntity = new UsersEntity();
+      outputUsersEntity.id = identifier.generateId();
+      outputUsersEntity.name = 'name';
+      outputUsersEntity.age = 20;
+      outputUsersEntity.createAt = defaultDate;
+      outputUsersEntity.updateAt = null;
+    });
+
+    it(`Should error delete user when find user and auth`, async () => {
+      const executeError = new Error('get byt id');
+      authDb.findOneBy.mockRejectedValue(executeError);
+      usersDb.findOneBy.mockRejectedValue(executeError);
+
+      const [error] = await repository.delete(inputId);
+
+      expect(authDb.findOneBy).toHaveBeenCalled();
+      expect(authDb.findOneBy).toHaveBeenCalledWith({id: inputId});
+      expect(usersDb.findOneBy).toHaveBeenCalled();
+      expect(usersDb.findOneBy).toHaveBeenCalledWith({id: inputId});
+      expect(error).toBeInstanceOf(RepositoryException);
+      expect((<RepositoryException>error).cause).toEqual(executeError);
+    });
+
+    it(`Should successfully delete user and return zero when not found auth or users record`, async () => {
+      authDb.findOneBy.mockResolvedValue(null);
+      usersDb.findOneBy.mockResolvedValue(null);
+
+      const [error, result] = await repository.delete(inputId);
+
+      expect(authDb.findOneBy).toHaveBeenCalled();
+      expect(authDb.findOneBy).toHaveBeenCalledWith({id: inputId});
+      expect(usersDb.findOneBy).toHaveBeenCalled();
+      expect(usersDb.findOneBy).toHaveBeenCalledWith({id: inputId});
+      expect(error).toBeNull();
+      expect(result).toEqual(0);
+    });
+
+    it(`Should error delete user when delete admin user with condition 'username = admin'`, async () => {
+      authDb.findOneBy.mockResolvedValue(outputAdminAuthEntity);
+      usersDb.findOneBy.mockResolvedValue(outputAdminUsersEntity);
+
+      const [error] = await repository.delete(inputId);
+
+      expect(authDb.findOneBy).toHaveBeenCalled();
+      expect(authDb.findOneBy).toHaveBeenCalledWith({id: inputId});
+      expect(usersDb.findOneBy).toHaveBeenCalled();
+      expect(usersDb.findOneBy).toHaveBeenCalledWith({id: inputId});
+      expect(error).toBeInstanceOf(DeleteReadonlyResourceException);
+    });
+
+    it(`Should error delete user when create connection`, async () => {
+      authDb.findOneBy.mockResolvedValue(outputAuthEntity);
+      usersDb.findOneBy.mockResolvedValue(outputUsersEntity);
+      dataSource.createQueryRunner.mockReturnValue(queryRunner);
+      const executeError = new Error('connect');
+      queryRunner.connect.mockRejectedValue(executeError);
+
+      const [error] = await repository.delete(inputId);
+
+      expect(authDb.findOneBy).toHaveBeenCalled();
+      expect(authDb.findOneBy).toHaveBeenCalledWith({id: inputId});
+      expect(usersDb.findOneBy).toHaveBeenCalled();
+      expect(usersDb.findOneBy).toHaveBeenCalledWith({id: inputId});
+      expect(dataSource.createQueryRunner).toHaveBeenCalled();
+      expect(queryRunner.connect).toHaveBeenCalled();
+      expect(queryRunner.rollbackTransaction).toHaveBeenCalledTimes(0);
+      expect(queryRunner.release).toHaveBeenCalledTimes(0);
+      expect(error).toBeInstanceOf(RepositoryException);
+      expect((<RepositoryException>error).cause).toEqual(executeError);
+    });
+
+    it(`Should error delete user when start transaction`, async () => {
+      authDb.findOneBy.mockResolvedValue(outputAuthEntity);
+      usersDb.findOneBy.mockResolvedValue(outputUsersEntity);
+      dataSource.createQueryRunner.mockReturnValue(queryRunner);
+      queryRunner.connect.mockResolvedValue(null);
+      const executeError = new Error('transaction');
+      queryRunner.startTransaction.mockRejectedValue(executeError);
+
+      const [error] = await repository.delete(inputId);
+
+      expect(authDb.findOneBy).toHaveBeenCalled();
+      expect(authDb.findOneBy).toHaveBeenCalledWith({id: inputId});
+      expect(usersDb.findOneBy).toHaveBeenCalled();
+      expect(usersDb.findOneBy).toHaveBeenCalledWith({id: inputId});
+      expect(dataSource.createQueryRunner).toHaveBeenCalled();
+      expect(queryRunner.connect).toHaveBeenCalled();
+      expect(queryRunner.startTransaction).toHaveBeenCalled();
+      expect(queryRunner.rollbackTransaction).toHaveBeenCalledTimes(0);
+      expect(queryRunner.release).toHaveBeenCalledTimes(1);
+      expect(error).toBeInstanceOf(RepositoryException);
+      expect((<RepositoryException>error).cause).toEqual(executeError);
+    });
+
+    it(`Should error delete user when soft delete auth`, async () => {
+      authDb.findOneBy.mockResolvedValue(outputAuthEntity);
+      usersDb.findOneBy.mockResolvedValue(outputUsersEntity);
+      dataSource.createQueryRunner.mockReturnValue(queryRunner);
+      queryRunner.connect.mockResolvedValue(null);
+      queryRunner.startTransaction.mockResolvedValue(null);
+      const executeError = new Error('soft delete auth');
+      (manager.softDelete).mockRejectedValueOnce(executeError);
+      queryRunner.rollbackTransaction.mockResolvedValue(null);
+
+      const [error] = await repository.delete(inputId);
+
+      expect(authDb.findOneBy).toHaveBeenCalled();
+      expect(authDb.findOneBy).toHaveBeenCalledWith({id: inputId});
+      expect(usersDb.findOneBy).toHaveBeenCalled();
+      expect(usersDb.findOneBy).toHaveBeenCalledWith({id: inputId});
+      expect(dataSource.createQueryRunner).toHaveBeenCalled();
+      expect(queryRunner.connect).toHaveBeenCalled();
+      expect(queryRunner.startTransaction).toHaveBeenCalled();
+      expect(queryRunner.manager.softDelete).toHaveBeenCalledTimes(1);
+      expect(queryRunner.rollbackTransaction).toHaveBeenCalledTimes(1);
+      expect(queryRunner.release).toHaveBeenCalledTimes(1);
+      expect(error).toBeInstanceOf(RepositoryException);
+      expect((<RepositoryException>error).cause).toEqual(executeError);
+    });
+
+    it(`Should error delete user when soft delete auth and fail to rollback`, async () => {
+      authDb.findOneBy.mockResolvedValue(outputAuthEntity);
+      usersDb.findOneBy.mockResolvedValue(outputUsersEntity);
+      dataSource.createQueryRunner.mockReturnValue(queryRunner);
+      queryRunner.connect.mockResolvedValue(null);
+      queryRunner.startTransaction.mockResolvedValue(null);
+      const executeError = new Error('soft delete auth');
+      (manager.softDelete).mockRejectedValueOnce(executeError);
+      const rollbackError = new Error('rollback');
+      queryRunner.rollbackTransaction.mockRejectedValueOnce(rollbackError);
+
+      const [error] = await repository.delete(inputId);
+
+      expect(authDb.findOneBy).toHaveBeenCalled();
+      expect(authDb.findOneBy).toHaveBeenCalledWith({id: inputId});
+      expect(usersDb.findOneBy).toHaveBeenCalled();
+      expect(usersDb.findOneBy).toHaveBeenCalledWith({id: inputId});
+      expect(dataSource.createQueryRunner).toHaveBeenCalled();
+      expect(queryRunner.connect).toHaveBeenCalled();
+      expect(queryRunner.startTransaction).toHaveBeenCalled();
+      expect(queryRunner.manager.softDelete).toHaveBeenCalledTimes(1);
+      expect(queryRunner.rollbackTransaction).toHaveBeenCalledTimes(1);
+      expect(queryRunner.release).toHaveBeenCalledTimes(1);
+      expect(error).toBeInstanceOf(RepositoryException);
+      expect((<RepositoryException>error).cause).toEqual(executeError);
+      expect((<RepositoryException>error).combine).toHaveLength(1);
+      expect((<RepositoryException>error).combine[0]).toEqual(rollbackError);
+    });
+
+    it(`Should error delete user when soft delete users`, async () => {
+      authDb.findOneBy.mockResolvedValue(outputAuthEntity);
+      usersDb.findOneBy.mockResolvedValue(outputUsersEntity);
+      dataSource.createQueryRunner.mockReturnValue(queryRunner);
+      queryRunner.connect.mockResolvedValue(null);
+      queryRunner.startTransaction.mockResolvedValue(null);
+      const executeError = new Error('soft delete users');
+      (manager.softDelete).mockResolvedValueOnce(null).mockRejectedValueOnce(executeError);
+      queryRunner.rollbackTransaction.mockResolvedValue(null);
+
+      const [error] = await repository.delete(inputId);
+
+      expect(authDb.findOneBy).toHaveBeenCalled();
+      expect(authDb.findOneBy).toHaveBeenCalledWith({id: inputId});
+      expect(usersDb.findOneBy).toHaveBeenCalled();
+      expect(usersDb.findOneBy).toHaveBeenCalledWith({id: inputId});
+      expect(dataSource.createQueryRunner).toHaveBeenCalled();
+      expect(queryRunner.connect).toHaveBeenCalled();
+      expect(queryRunner.startTransaction).toHaveBeenCalled();
+      expect(queryRunner.manager.softDelete).toHaveBeenCalledTimes(2);
+      expect(queryRunner.rollbackTransaction).toHaveBeenCalledTimes(1);
+      expect(queryRunner.release).toHaveBeenCalledTimes(1);
+      expect(error).toBeInstanceOf(RepositoryException);
+      expect((<RepositoryException>error).cause).toEqual(executeError);
+    });
+
+    it(`Should error delete user when soft delete users and fail to rollback`, async () => {
+      authDb.findOneBy.mockResolvedValue(outputAuthEntity);
+      usersDb.findOneBy.mockResolvedValue(outputUsersEntity);
+      dataSource.createQueryRunner.mockReturnValue(queryRunner);
+      queryRunner.connect.mockResolvedValue(null);
+      queryRunner.startTransaction.mockResolvedValue(null);
+      const executeError = new Error('soft delete users');
+      (manager.softDelete).mockResolvedValueOnce(null).mockRejectedValueOnce(executeError);
+      const rollbackError = new Error('rollback');
+      queryRunner.rollbackTransaction.mockRejectedValueOnce(rollbackError);
+
+      const [error] = await repository.delete(inputId);
+
+      expect(authDb.findOneBy).toHaveBeenCalled();
+      expect(authDb.findOneBy).toHaveBeenCalledWith({id: inputId});
+      expect(usersDb.findOneBy).toHaveBeenCalled();
+      expect(usersDb.findOneBy).toHaveBeenCalledWith({id: inputId});
+      expect(dataSource.createQueryRunner).toHaveBeenCalled();
+      expect(queryRunner.connect).toHaveBeenCalled();
+      expect(queryRunner.startTransaction).toHaveBeenCalled();
+      expect(queryRunner.manager.softDelete).toHaveBeenCalledTimes(2);
+      expect(queryRunner.rollbackTransaction).toHaveBeenCalledTimes(1);
+      expect(queryRunner.release).toHaveBeenCalledTimes(1);
+      expect(error).toBeInstanceOf(RepositoryException);
+      expect((<RepositoryException>error).cause).toEqual(executeError);
+      expect((<RepositoryException>error).combine).toHaveLength(1);
+      expect((<RepositoryException>error).combine[0]).toEqual(rollbackError);
+    });
+
+    it(`Should successfully delete user`, async () => {
+      authDb.findOneBy.mockResolvedValue(outputAuthEntity);
+      usersDb.findOneBy.mockResolvedValue(outputUsersEntity);
+      dataSource.createQueryRunner.mockReturnValue(queryRunner);
+      queryRunner.connect.mockResolvedValue(null);
+      queryRunner.startTransaction.mockResolvedValue(null);
+      (manager.softDelete).mockResolvedValue(null);
+      queryRunner.commitTransaction.mockResolvedValue(null);
+
+      const [error, result] = await repository.delete(inputId);
+
+      expect(authDb.findOneBy).toHaveBeenCalled();
+      expect(authDb.findOneBy).toHaveBeenCalledWith({id: inputId});
+      expect(usersDb.findOneBy).toHaveBeenCalled();
+      expect(usersDb.findOneBy).toHaveBeenCalledWith({id: inputId});
+      expect(dataSource.createQueryRunner).toHaveBeenCalled();
+      expect(queryRunner.connect).toHaveBeenCalled();
+      expect(queryRunner.startTransaction).toHaveBeenCalled();
+      expect(queryRunner.manager.softDelete).toHaveBeenCalledTimes(2);
+      expect(queryRunner.commitTransaction).toHaveBeenCalled();
+      expect(queryRunner.rollbackTransaction).toHaveBeenCalledTimes(0);
       expect(queryRunner.release).toHaveBeenCalledTimes(1);
       expect(error).toBeNull();
       expect(result).toEqual(1);

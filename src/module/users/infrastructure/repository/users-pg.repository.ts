@@ -1,5 +1,5 @@
 import {GenericRepositoryInterface} from '../../core/interface/generic-repository.interface';
-import {UsersModel} from '../../core/model/users.model';
+import {UsersModel, UsersRoleEnum} from '../../core/model/users.model';
 import {AsyncReturn} from '@src-utility/utility';
 import {UpdateModel} from '@src-utility/model/update.model';
 import {DataSource, FindManyOptions, Repository} from 'typeorm';
@@ -10,6 +10,7 @@ import {UsersEntity} from '../entity/users.entity';
 import {SortEnum} from '@src-utility/model/filter.model';
 import {RepositoryException} from '../../core/exception/repository.exception';
 import {QueryRunner} from 'typeorm/query-runner/QueryRunner';
+import {DeleteReadonlyResourceException} from '../../core/exception/delete-readonly-resource.exception';
 
 export class UsersPgRepository implements GenericRepositoryInterface<UsersModel> {
   constructor(
@@ -109,21 +110,21 @@ export class UsersPgRepository implements GenericRepositoryInterface<UsersModel>
   async update(model: UpdateModel<UsersModel>): AsyncReturn<Error, number> {
     const updateUserModel = model.getModel();
 
+    const [findError, findData] = await this._findOneAuthAndUsers(model.id);
+    if (findError) {
+      return [findError];
+    }
+
+    const {authRow, usersRow} = findData;
+    if (!(authRow && usersRow)) {
+      return [null, 0];
+    }
+
     const txOption = {isConnect: false, isTxStart: false};
     const updateState = {shouldUpdateAuth: false, shouldUpdateUser: false};
-    let queryRunner;
+    const queryRunner = this._dataSource.createQueryRunner();
 
     try {
-      const [authRow, usersRow] = await Promise.all([
-        this._authDb.findOneBy({id: model.id}),
-        this._usersDb.findOneBy({id: model.id}),
-      ]);
-      if (!(authRow && usersRow)) {
-        return [null, 0];
-      }
-
-      queryRunner = this._dataSource.createQueryRunner();
-
       await queryRunner.connect();
       txOption.isConnect = true;
 
@@ -158,22 +159,57 @@ export class UsersPgRepository implements GenericRepositoryInterface<UsersModel>
       return [null, updateCount];
     } catch (error) {
       const repositoryError = new RepositoryException(error);
-      if (!queryRunner) {
-        return [repositoryError];
-      }
-
       const [rollbackError] = await this._rollbackExecute(repositoryError, queryRunner, txOption.isTxStart);
 
       return [rollbackError];
     } finally {
-      if (queryRunner && txOption.isConnect) {
+      if (txOption.isConnect) {
         await queryRunner.release();
       }
     }
   }
 
   async delete(id: string): AsyncReturn<Error, number> {
-    return Promise.resolve(undefined);
+    const [findError, findData] = await this._findOneAuthAndUsers(id);
+    if (findError) {
+      return [findError];
+    }
+
+    const {authRow, usersRow} = findData;
+    if (!(authRow && usersRow)) {
+      return [null, 0];
+    }
+
+    if (authRow.username === 'admin' && authRow.role === UsersRoleEnum.ADMIN) {
+      return [new DeleteReadonlyResourceException()];
+    }
+
+    const txOption = {isConnect: false, isTxStart: false};
+    const queryRunner = this._dataSource.createQueryRunner();
+
+    try {
+      await queryRunner.connect();
+      txOption.isConnect = true;
+
+      await queryRunner.startTransaction();
+      txOption.isTxStart = true;
+
+      await queryRunner.manager.softDelete(AuthEntity, id);
+      await queryRunner.manager.softDelete(UsersEntity, id);
+
+      await queryRunner.commitTransaction();
+
+      return [null, 1];
+    } catch (error) {
+      const repositoryError = new RepositoryException(error);
+      const [rollbackError] = await this._rollbackExecute(repositoryError, queryRunner, txOption.isTxStart);
+
+      return [rollbackError];
+    } finally {
+      if (txOption.isConnect) {
+        await queryRunner.release();
+      }
+    }
   }
 
   private static _fillModel(entity: UsersEntity) {
@@ -201,6 +237,19 @@ export class UsersPgRepository implements GenericRepositoryInterface<UsersModel>
       return [executeError];
     } catch (error) {
       return [new RepositoryException(error, executeError)];
+    }
+  }
+
+  private async _findOneAuthAndUsers(id: string): AsyncReturn<Error, { authRow: AuthEntity, usersRow: UsersEntity }> {
+    try {
+      const [authRow, usersRow] = await Promise.all([
+        this._authDb.findOneBy({id}),
+        this._usersDb.findOneBy({id}),
+      ]);
+
+      return [null, {authRow, usersRow}];
+    } catch (error) {
+      return [new RepositoryException(error)];
     }
   }
 }
