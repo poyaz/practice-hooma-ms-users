@@ -12,6 +12,7 @@ import {RepositoryException} from '../../core/exception/repository.exception';
 import {DefaultPropertiesSymbol, IsDefaultSymbol} from '@src-utility/model/symbol';
 import {QueryRunner} from 'typeorm/query-runner/QueryRunner';
 import {EntityManager} from 'typeorm/entity-manager/EntityManager';
+import {UpdateModel} from '@src-utility/model/update.model';
 
 describe('UsersPgRepository', () => {
   let repository: UsersPgRepository;
@@ -418,6 +419,242 @@ describe('UsersPgRepository', () => {
         age: outputUsersEntity.age,
         createAt: defaultDate,
       });
+    });
+  });
+
+  describe(`update`, () => {
+    let inputModel: UpdateModel<UsersModel>;
+    let outputAuthEntity: AuthEntity;
+    let outputUsersEntity: UsersEntity;
+
+    beforeEach(() => {
+      inputModel = new UpdateModel<UsersModel>(identifier.generateId(), {
+        password: 'new-password',
+        name: 'new-name',
+        age: 21,
+      });
+
+      outputAuthEntity = new AuthEntity();
+      outputAuthEntity.username = 'username';
+      outputAuthEntity.password = 'password';
+      outputAuthEntity.salt = 'salt';
+      outputAuthEntity.role = UsersRoleEnum.USER;
+      outputAuthEntity.createAt = defaultDate;
+
+      outputUsersEntity = new UsersEntity();
+      outputUsersEntity.id = identifier.generateId();
+      outputUsersEntity.name = 'name';
+      outputUsersEntity.age = 20;
+      outputUsersEntity.createAt = defaultDate;
+      outputUsersEntity.updateAt = null;
+    });
+
+    it(`Should error update user when find user and auth`, async () => {
+      const executeError = new Error('get byt id');
+      authDb.findOneBy.mockRejectedValue(executeError);
+      usersDb.findOneBy.mockRejectedValue(executeError);
+
+      const [error] = await repository.update(inputModel);
+
+      expect(authDb.findOneBy).toHaveBeenCalled();
+      expect(authDb.findOneBy).toHaveBeenCalledWith({id: inputModel.id});
+      expect(usersDb.findOneBy).toHaveBeenCalled();
+      expect(usersDb.findOneBy).toHaveBeenCalledWith({id: inputModel.id});
+      expect(error).toBeInstanceOf(RepositoryException);
+      expect((<RepositoryException>error).cause).toEqual(executeError);
+    });
+
+    it(`Should successfully update user and return zero when not found auth or users record`, async () => {
+      authDb.findOneBy.mockResolvedValue(null);
+      usersDb.findOneBy.mockResolvedValue(null);
+
+      const [error, result] = await repository.update(inputModel);
+
+      expect(authDb.findOneBy).toHaveBeenCalled();
+      expect(authDb.findOneBy).toHaveBeenCalledWith({id: inputModel.id});
+      expect(usersDb.findOneBy).toHaveBeenCalled();
+      expect(usersDb.findOneBy).toHaveBeenCalledWith({id: inputModel.id});
+      expect(error).toBeNull();
+      expect(result).toEqual(0);
+    });
+
+    it(`Should error update user when create connection`, async () => {
+      authDb.findOneBy.mockResolvedValue(outputAuthEntity);
+      usersDb.findOneBy.mockResolvedValue(outputUsersEntity);
+      dataSource.createQueryRunner.mockReturnValue(queryRunner);
+      const executeError = new Error('connect');
+      queryRunner.connect.mockRejectedValue(executeError);
+
+      const [error] = await repository.update(inputModel);
+
+      expect(authDb.findOneBy).toHaveBeenCalled();
+      expect(authDb.findOneBy).toHaveBeenCalledWith({id: inputModel.id});
+      expect(usersDb.findOneBy).toHaveBeenCalled();
+      expect(usersDb.findOneBy).toHaveBeenCalledWith({id: inputModel.id});
+      expect(dataSource.createQueryRunner).toHaveBeenCalled();
+      expect(queryRunner.connect).toHaveBeenCalled();
+      expect(queryRunner.rollbackTransaction).toHaveBeenCalledTimes(0);
+      expect(queryRunner.release).toHaveBeenCalledTimes(0);
+      expect(error).toBeInstanceOf(RepositoryException);
+      expect((<RepositoryException>error).cause).toEqual(executeError);
+    });
+
+    it(`Should error update user when start transaction`, async () => {
+      authDb.findOneBy.mockResolvedValue(outputAuthEntity);
+      usersDb.findOneBy.mockResolvedValue(outputUsersEntity);
+      dataSource.createQueryRunner.mockReturnValue(queryRunner);
+      queryRunner.connect.mockReturnValue(null);
+      const executeError = new Error('transaction');
+      queryRunner.startTransaction.mockRejectedValue(executeError);
+
+      const [error] = await repository.update(inputModel);
+
+      expect(authDb.findOneBy).toHaveBeenCalled();
+      expect(authDb.findOneBy).toHaveBeenCalledWith({id: inputModel.id});
+      expect(usersDb.findOneBy).toHaveBeenCalled();
+      expect(usersDb.findOneBy).toHaveBeenCalledWith({id: inputModel.id});
+      expect(dataSource.createQueryRunner).toHaveBeenCalled();
+      expect(queryRunner.connect).toHaveBeenCalled();
+      expect(queryRunner.startTransaction).toHaveBeenCalled();
+      expect(queryRunner.rollbackTransaction).toHaveBeenCalledTimes(0);
+      expect(queryRunner.release).toHaveBeenCalledTimes(1);
+      expect(error).toBeInstanceOf(RepositoryException);
+      expect((<RepositoryException>error).cause).toEqual(executeError);
+    });
+
+    it(`Should error update user when update auth`, async () => {
+      authDb.findOneBy.mockResolvedValue(outputAuthEntity);
+      usersDb.findOneBy.mockResolvedValue(outputUsersEntity);
+      dataSource.createQueryRunner.mockReturnValue(queryRunner);
+      queryRunner.connect.mockReturnValue(null);
+      queryRunner.startTransaction.mockReturnValue(null);
+      const executeError = new Error('update auth');
+      (manager.save).mockRejectedValueOnce(executeError);
+      queryRunner.rollbackTransaction.mockResolvedValue(null);
+
+      const [error] = await repository.update(inputModel);
+
+      expect(authDb.findOneBy).toHaveBeenCalled();
+      expect(authDb.findOneBy).toHaveBeenCalledWith({id: inputModel.id});
+      expect(usersDb.findOneBy).toHaveBeenCalled();
+      expect(usersDb.findOneBy).toHaveBeenCalledWith({id: inputModel.id});
+      expect(dataSource.createQueryRunner).toHaveBeenCalled();
+      expect(queryRunner.connect).toHaveBeenCalled();
+      expect(queryRunner.startTransaction).toHaveBeenCalled();
+      expect(queryRunner.manager.save).toHaveBeenCalledTimes(1);
+      expect(queryRunner.rollbackTransaction).toHaveBeenCalledTimes(1);
+      expect(queryRunner.release).toHaveBeenCalledTimes(1);
+      expect(error).toBeInstanceOf(RepositoryException);
+      expect((<RepositoryException>error).cause).toEqual(executeError);
+    });
+
+    it(`Should error update user when update auth and fail to rollback`, async () => {
+      authDb.findOneBy.mockResolvedValue(outputAuthEntity);
+      usersDb.findOneBy.mockResolvedValue(outputUsersEntity);
+      dataSource.createQueryRunner.mockReturnValue(queryRunner);
+      queryRunner.connect.mockReturnValue(null);
+      queryRunner.startTransaction.mockReturnValue(null);
+      const executeError = new Error('update auth');
+      (manager.save).mockRejectedValueOnce(executeError);
+      const rollbackError = new Error('rollback');
+      queryRunner.rollbackTransaction.mockRejectedValueOnce(rollbackError);
+
+      const [error] = await repository.update(inputModel);
+
+      expect(authDb.findOneBy).toHaveBeenCalled();
+      expect(authDb.findOneBy).toHaveBeenCalledWith({id: inputModel.id});
+      expect(usersDb.findOneBy).toHaveBeenCalled();
+      expect(usersDb.findOneBy).toHaveBeenCalledWith({id: inputModel.id});
+      expect(dataSource.createQueryRunner).toHaveBeenCalled();
+      expect(queryRunner.connect).toHaveBeenCalled();
+      expect(queryRunner.startTransaction).toHaveBeenCalled();
+      expect(queryRunner.manager.save).toHaveBeenCalledTimes(1);
+      expect(queryRunner.rollbackTransaction).toHaveBeenCalledTimes(1);
+      expect(queryRunner.release).toHaveBeenCalledTimes(1);
+      expect(error).toBeInstanceOf(RepositoryException);
+      expect((<RepositoryException>error).cause).toEqual(executeError);
+      expect((<RepositoryException>error).combine).toHaveLength(1);
+      expect((<RepositoryException>error).combine[0]).toEqual(rollbackError);
+    });
+
+    it(`Should error update user when update users`, async () => {
+      authDb.findOneBy.mockResolvedValue(outputAuthEntity);
+      usersDb.findOneBy.mockResolvedValue(outputUsersEntity);
+      dataSource.createQueryRunner.mockReturnValue(queryRunner);
+      queryRunner.connect.mockReturnValue(null);
+      queryRunner.startTransaction.mockReturnValue(null);
+      const executeError = new Error('update users');
+      (manager.save).mockResolvedValueOnce(null).mockRejectedValueOnce(executeError);
+      queryRunner.rollbackTransaction.mockResolvedValue(null);
+
+      const [error] = await repository.update(inputModel);
+
+      expect(authDb.findOneBy).toHaveBeenCalled();
+      expect(authDb.findOneBy).toHaveBeenCalledWith({id: inputModel.id});
+      expect(usersDb.findOneBy).toHaveBeenCalled();
+      expect(usersDb.findOneBy).toHaveBeenCalledWith({id: inputModel.id});
+      expect(dataSource.createQueryRunner).toHaveBeenCalled();
+      expect(queryRunner.connect).toHaveBeenCalled();
+      expect(queryRunner.startTransaction).toHaveBeenCalled();
+      expect(queryRunner.manager.save).toHaveBeenCalledTimes(2);
+      expect(queryRunner.rollbackTransaction).toHaveBeenCalledTimes(1);
+      expect(queryRunner.release).toHaveBeenCalledTimes(1);
+      expect(error).toBeInstanceOf(RepositoryException);
+      expect((<RepositoryException>error).cause).toEqual(executeError);
+    });
+
+    it(`Should error update user when update users and fail to rollback`, async () => {
+      authDb.findOneBy.mockResolvedValue(outputAuthEntity);
+      usersDb.findOneBy.mockResolvedValue(outputUsersEntity);
+      dataSource.createQueryRunner.mockReturnValue(queryRunner);
+      queryRunner.connect.mockReturnValue(null);
+      queryRunner.startTransaction.mockReturnValue(null);
+      const executeError = new Error('update users');
+      (manager.save).mockResolvedValueOnce(null).mockRejectedValueOnce(executeError);
+      const rollbackError = new Error('rollback');
+      queryRunner.rollbackTransaction.mockRejectedValueOnce(rollbackError);
+
+      const [error] = await repository.update(inputModel);
+
+      expect(authDb.findOneBy).toHaveBeenCalled();
+      expect(authDb.findOneBy).toHaveBeenCalledWith({id: inputModel.id});
+      expect(usersDb.findOneBy).toHaveBeenCalled();
+      expect(usersDb.findOneBy).toHaveBeenCalledWith({id: inputModel.id});
+      expect(dataSource.createQueryRunner).toHaveBeenCalled();
+      expect(queryRunner.connect).toHaveBeenCalled();
+      expect(queryRunner.startTransaction).toHaveBeenCalled();
+      expect(queryRunner.manager.save).toHaveBeenCalledTimes(2);
+      expect(queryRunner.rollbackTransaction).toHaveBeenCalledTimes(1);
+      expect(queryRunner.release).toHaveBeenCalledTimes(1);
+      expect(error).toBeInstanceOf(RepositoryException);
+      expect((<RepositoryException>error).cause).toEqual(executeError);
+      expect((<RepositoryException>error).combine).toHaveLength(1);
+      expect((<RepositoryException>error).combine[0]).toEqual(rollbackError);
+    });
+
+    it(`Should successfully update user`, async () => {
+      authDb.findOneBy.mockResolvedValue(outputAuthEntity);
+      usersDb.findOneBy.mockResolvedValue(outputUsersEntity);
+      dataSource.createQueryRunner.mockReturnValue(queryRunner);
+      queryRunner.connect.mockReturnValue(null);
+      queryRunner.startTransaction.mockReturnValue(null);
+      (manager.save).mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+      queryRunner.commitTransaction.mockResolvedValue(null);
+
+      const [error, result] = await repository.update(inputModel);
+
+      expect(authDb.findOneBy).toHaveBeenCalled();
+      expect(authDb.findOneBy).toHaveBeenCalledWith({id: inputModel.id});
+      expect(usersDb.findOneBy).toHaveBeenCalled();
+      expect(usersDb.findOneBy).toHaveBeenCalledWith({id: inputModel.id});
+      expect(dataSource.createQueryRunner).toHaveBeenCalled();
+      expect(queryRunner.connect).toHaveBeenCalled();
+      expect(queryRunner.startTransaction).toHaveBeenCalled();
+      expect(queryRunner.manager.save).toHaveBeenCalledTimes(2);
+      expect(queryRunner.commitTransaction).toHaveBeenCalledTimes(1);
+      expect(queryRunner.release).toHaveBeenCalledTimes(1);
+      expect(error).toBeNull();
+      expect(result).toEqual(1);
     });
   });
 });
