@@ -1,6 +1,6 @@
 import {UsersPgRepository} from './users-pg.repository';
 import {AUTH_ENTITY_OPTIONS, AuthEntity} from '../entity/auth.entity';
-import {FindManyOptions, Repository} from 'typeorm';
+import {DataSource, FindManyOptions, Repository} from 'typeorm';
 import {mock, MockProxy} from 'jest-mock-extended';
 import {UsersEntity} from '../entity/users.entity';
 import {IdentifierInterface} from '../../core/interface/identifier.interface';
@@ -10,9 +10,14 @@ import {UsersModel, UsersRoleEnum} from '../../core/model/users.model';
 import {SortEnum} from '@src-utility/model/filter.model';
 import {RepositoryException} from '../../core/exception/repository.exception';
 import {DefaultPropertiesSymbol, IsDefaultSymbol} from '@src-utility/model/symbol';
+import {QueryRunner} from 'typeorm/query-runner/QueryRunner';
+import {EntityManager} from 'typeorm/entity-manager/EntityManager';
 
 describe('UsersPgRepository', () => {
   let repository: UsersPgRepository;
+  let dataSource: MockProxy<DataSource>;
+  let manager: MockProxy<EntityManager>;
+  let queryRunner: MockProxy<QueryRunner>;
   let authDb: MockProxy<Repository<AuthEntity>>;
   let usersDb: MockProxy<Repository<UsersEntity>>;
   let identifier: MockProxy<IdentifierInterface>;
@@ -20,6 +25,12 @@ describe('UsersPgRepository', () => {
   const defaultDate = new Date('2020-01-01');
 
   beforeEach(async () => {
+    const dataSourceProvider = 'DATA_SOURCE';
+    dataSource = mock<DataSource>();
+
+    manager = mock<EntityManager>();
+    queryRunner = mock<QueryRunner>({manager});
+
     const authDbProvider = 'AUTH_DB';
     authDb = mock<Repository<AuthEntity>>();
 
@@ -36,6 +47,10 @@ describe('UsersPgRepository', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        {
+          provide: dataSourceProvider,
+          useValue: dataSource,
+        },
         {
           provide: authDbProvider,
           useValue: authDb,
@@ -54,13 +69,14 @@ describe('UsersPgRepository', () => {
         },
         {
           provide: UsersPgRepository,
-          inject: [authDbProvider, usersDbProvider, identifierProvider, dateTimeProvider],
+          inject: [dataSourceProvider, authDbProvider, usersDbProvider, identifierProvider, dateTimeProvider],
           useFactory: (
+            dataSource: DataSource,
             authDb: Repository<AuthEntity>,
             usersDb: Repository<UsersEntity>,
             identifier: IdentifierInterface,
             dateTimeProvider: DateTimeInterface,
-          ) => new UsersPgRepository(authDb, usersDb, identifier, dateTimeProvider),
+          ) => new UsersPgRepository(dataSource, authDb, usersDb, identifier, dateTimeProvider),
         },
       ],
     }).compile();
@@ -220,6 +236,183 @@ describe('UsersPgRepository', () => {
         username: outputUsersEntity.auth.username,
         password: outputUsersEntity.auth.password,
         salt: outputUsersEntity.auth.salt,
+        role: UsersRoleEnum.USER,
+        name: outputUsersEntity.name,
+        age: outputUsersEntity.age,
+        createAt: defaultDate,
+      });
+    });
+  });
+
+  describe(`create`, () => {
+    let inputModel: UsersModel;
+    let outputAuthEntity: AuthEntity;
+    let outputUsersEntity: UsersEntity;
+
+    beforeEach(() => {
+      inputModel = UsersModel.getDefaultModel();
+      inputModel.username = 'username';
+      inputModel.password = 'password';
+      inputModel.salt = 'salt';
+      inputModel.role = UsersRoleEnum.USER;
+      inputModel.name = 'name';
+      inputModel.age = 20;
+
+      outputAuthEntity = new AuthEntity();
+      outputAuthEntity.username = 'username';
+      outputAuthEntity.password = 'password';
+      outputAuthEntity.salt = 'salt';
+      outputAuthEntity.role = UsersRoleEnum.USER;
+      outputAuthEntity.createAt = defaultDate;
+
+      outputUsersEntity = new UsersEntity();
+      outputUsersEntity.id = identifier.generateId();
+      outputUsersEntity.name = 'name';
+      outputUsersEntity.age = 20;
+      outputUsersEntity.createAt = defaultDate;
+      outputUsersEntity.updateAt = null;
+    });
+
+    it(`Should error create users when create connection`, async () => {
+      dataSource.createQueryRunner.mockReturnValue(queryRunner);
+      const executeError = new Error('connect');
+      queryRunner.connect.mockRejectedValue(executeError);
+
+      const [error] = await repository.create(inputModel);
+
+      expect(dataSource.createQueryRunner).toHaveBeenCalled();
+      expect(queryRunner.connect).toHaveBeenCalled();
+      expect(queryRunner.rollbackTransaction).toHaveBeenCalledTimes(0);
+      expect(queryRunner.release).toHaveBeenCalledTimes(0);
+      expect(error).toBeInstanceOf(RepositoryException);
+      expect((<RepositoryException>error).cause).toEqual(executeError);
+    });
+
+    it(`Should error create users when create transaction`, async () => {
+      dataSource.createQueryRunner.mockReturnValue(queryRunner);
+      queryRunner.connect.mockResolvedValue(null);
+      const executeError = new Error('transaction');
+      queryRunner.startTransaction.mockRejectedValue(executeError);
+
+      const [error] = await repository.create(inputModel);
+
+      expect(dataSource.createQueryRunner).toHaveBeenCalled();
+      expect(queryRunner.connect).toHaveBeenCalled();
+      expect(queryRunner.startTransaction).toHaveBeenCalled();
+      expect(queryRunner.rollbackTransaction).toHaveBeenCalledTimes(0);
+      expect(queryRunner.release).toHaveBeenCalledTimes(1);
+      expect(error).toBeInstanceOf(RepositoryException);
+      expect((<RepositoryException>error).cause).toEqual(executeError);
+    });
+
+    it(`Should error create users when insert auth data`, async () => {
+      dataSource.createQueryRunner.mockReturnValue(queryRunner);
+      queryRunner.connect.mockResolvedValue(null);
+      queryRunner.startTransaction.mockResolvedValue(null);
+      const executeError = new Error('insert auth');
+      (manager.save).mockRejectedValueOnce(executeError);
+      queryRunner.rollbackTransaction.mockResolvedValue(null);
+
+      const [error] = await repository.create(inputModel);
+
+      expect(dataSource.createQueryRunner).toHaveBeenCalled();
+      expect(queryRunner.connect).toHaveBeenCalled();
+      expect(queryRunner.startTransaction).toHaveBeenCalled();
+      expect(queryRunner.manager.save).toHaveBeenCalledTimes(1);
+      expect(queryRunner.rollbackTransaction).toHaveBeenCalledTimes(1);
+      expect(queryRunner.release).toHaveBeenCalledTimes(1);
+      expect(error).toBeInstanceOf(RepositoryException);
+      expect((<RepositoryException>error).cause).toEqual(executeError);
+    });
+
+    it(`Should error create users when insert auth data and fail to rollback`, async () => {
+      dataSource.createQueryRunner.mockReturnValue(queryRunner);
+      queryRunner.connect.mockResolvedValue(null);
+      queryRunner.startTransaction.mockResolvedValue(null);
+      const executeError = new Error('insert auth');
+      (manager.save).mockRejectedValueOnce(executeError);
+      const rollbackError = new Error('rollback');
+      queryRunner.rollbackTransaction.mockRejectedValueOnce(rollbackError);
+
+      const [error] = await repository.create(inputModel);
+
+      expect(dataSource.createQueryRunner).toHaveBeenCalled();
+      expect(queryRunner.connect).toHaveBeenCalled();
+      expect(queryRunner.startTransaction).toHaveBeenCalled();
+      expect(queryRunner.manager.save).toHaveBeenCalledTimes(1);
+      expect(queryRunner.rollbackTransaction).toHaveBeenCalledTimes(1);
+      expect(queryRunner.release).toHaveBeenCalledTimes(1);
+      expect(error).toBeInstanceOf(RepositoryException);
+      expect((<RepositoryException>error).cause).toEqual(executeError);
+      expect((<RepositoryException>error).combine).toHaveLength(1);
+      expect((<RepositoryException>error).combine[0]).toEqual(rollbackError);
+    });
+
+    it(`Should error create users when insert users data`, async () => {
+      dataSource.createQueryRunner.mockReturnValue(queryRunner);
+      queryRunner.connect.mockResolvedValue(null);
+      queryRunner.startTransaction.mockResolvedValue(null);
+      const executeError = new Error('insert users');
+      (manager.save).mockResolvedValueOnce(outputAuthEntity).mockRejectedValueOnce(executeError);
+      queryRunner.rollbackTransaction.mockResolvedValue(null);
+
+      const [error] = await repository.create(inputModel);
+
+      expect(dataSource.createQueryRunner).toHaveBeenCalled();
+      expect(queryRunner.connect).toHaveBeenCalled();
+      expect(queryRunner.startTransaction).toHaveBeenCalled();
+      expect(queryRunner.manager.save).toHaveBeenCalledTimes(2);
+      expect(queryRunner.rollbackTransaction).toHaveBeenCalledTimes(1);
+      expect(queryRunner.release).toHaveBeenCalledTimes(1);
+      expect(error).toBeInstanceOf(RepositoryException);
+      expect((<RepositoryException>error).cause).toEqual(executeError);
+    });
+
+    it(`Should error create users when insert users data and fail to rollback`, async () => {
+      dataSource.createQueryRunner.mockReturnValue(queryRunner);
+      queryRunner.connect.mockResolvedValue(null);
+      queryRunner.startTransaction.mockResolvedValue(null);
+      const executeError = new Error('insert auth');
+      (manager.save).mockResolvedValueOnce(outputAuthEntity).mockRejectedValueOnce(executeError);
+      const rollbackError = new Error('rollback');
+      queryRunner.rollbackTransaction.mockRejectedValueOnce(rollbackError);
+
+      const [error] = await repository.create(inputModel);
+
+      expect(dataSource.createQueryRunner).toHaveBeenCalled();
+      expect(queryRunner.connect).toHaveBeenCalled();
+      expect(queryRunner.startTransaction).toHaveBeenCalled();
+      expect(queryRunner.manager.save).toHaveBeenCalledTimes(2);
+      expect(queryRunner.rollbackTransaction).toHaveBeenCalledTimes(1);
+      expect(queryRunner.release).toHaveBeenCalledTimes(1);
+      expect(error).toBeInstanceOf(RepositoryException);
+      expect((<RepositoryException>error).cause).toEqual(executeError);
+      expect((<RepositoryException>error).combine).toHaveLength(1);
+      expect((<RepositoryException>error).combine[0]).toEqual(rollbackError);
+    });
+
+    it(`Should successfully create users`, async () => {
+      dataSource.createQueryRunner.mockReturnValue(queryRunner);
+      queryRunner.connect.mockResolvedValue(null);
+      queryRunner.startTransaction.mockResolvedValue(null);
+      (manager.save).mockResolvedValueOnce(outputAuthEntity).mockResolvedValueOnce(outputUsersEntity);
+      queryRunner.commitTransaction.mockResolvedValue(null);
+
+      const [error, result] = await repository.create(inputModel);
+
+      expect(dataSource.createQueryRunner).toHaveBeenCalled();
+      expect(queryRunner.connect).toHaveBeenCalled();
+      expect(queryRunner.startTransaction).toHaveBeenCalled();
+      expect(queryRunner.manager.save).toHaveBeenCalledTimes(2);
+      expect(queryRunner.rollbackTransaction).toHaveBeenCalledTimes(0);
+      expect(queryRunner.commitTransaction).toHaveBeenCalled();
+      expect(queryRunner.release).toHaveBeenCalledTimes(1);
+      expect(error).toBeNull();
+      expect(result).toMatchObject<Omit<UsersModel, 'clone' | typeof IsDefaultSymbol | typeof DefaultPropertiesSymbol>>({
+        id: outputUsersEntity.id,
+        username: outputAuthEntity.username,
+        password: outputAuthEntity.password,
+        salt: outputAuthEntity.salt,
         role: UsersRoleEnum.USER,
         name: outputUsersEntity.name,
         age: outputUsersEntity.age,
