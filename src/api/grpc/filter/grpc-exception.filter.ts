@@ -8,6 +8,7 @@ import {Observable, throwError} from 'rxjs';
 import {status, Metadata} from '@grpc/grpc-js';
 import {NotFoundException} from '../../../module/users/core/exception/not-found.exception';
 import {DeleteReadonlyResourceException} from '../../../module/users/core/exception/delete-readonly-resource.exception';
+import {UpdateReadonlyResourceException} from '../../../module/users/core/exception/update-readonly-resource.exception';
 
 export enum ExceptionEnum {
   FORBIDDEN_ERROR = 'FORBIDDEN_ERROR',
@@ -63,6 +64,7 @@ export class GrpcExceptionFilter<T> implements RpcExceptionFilter {
       case exception instanceof NotFoundException:
         code = status.NOT_FOUND;
         break;
+      case exception instanceof UpdateReadonlyResourceException:
       case exception instanceof DeleteReadonlyResourceException:
         code = status.PERMISSION_DENIED;
         break;
