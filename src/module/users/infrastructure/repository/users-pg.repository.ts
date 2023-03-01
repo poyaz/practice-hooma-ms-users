@@ -3,7 +3,7 @@ import {UsersModel} from '../../core/model/users.model';
 import {AsyncReturn} from '@src-utility/utility';
 import {UpdateModel} from '@src-utility/model/update.model';
 import {FindManyOptions, Repository} from 'typeorm';
-import {AuthEntity} from '../entity/auth.entity';
+import {AUTH_ENTITY_OPTIONS, AuthEntity} from '../entity/auth.entity';
 import {IdentifierInterface} from '../../core/interface/identifier.interface';
 import {DateTimeInterface} from '../../core/interface/date-time.interface';
 import {UsersEntity} from '../entity/users.entity';
@@ -20,13 +20,12 @@ export class UsersPgRepository implements GenericRepositoryInterface<UsersModel>
   }
 
   async getAll<F>(filter?: F): AsyncReturn<Error, Array<UsersModel>> {
-    const findOptions: FindManyOptions<UsersEntity> = {order: {auth: {createAt: SortEnum.DESC}}};
+    const findOptions: FindManyOptions<UsersEntity> = {
+      relations: [AUTH_ENTITY_OPTIONS.tableName],
+      order: {createAt: SortEnum.DESC},
+    };
 
     try {
-      // const [rows, count] = await this._usersDb.createQueryBuilder('users')
-      //   .select(['*'])
-      //   .innerJoin(AuthEntity, 'auth', 'auth.id = users.id')
-      //   .getManyAndCount();
       const [rows, count] = await this._usersDb.findAndCount(findOptions);
       const result = rows.map((v) => UsersPgRepository._fillModel(v));
 

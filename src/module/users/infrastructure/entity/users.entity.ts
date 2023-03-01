@@ -6,10 +6,10 @@ import {
   Entity,
   JoinColumn, OneToOne,
   PrimaryColumn,
-  UpdateDateColumn
+  UpdateDateColumn,
 } from 'typeorm';
 import {Exclude} from 'class-transformer';
-import {AUTH_ENTITY_OPTIONS, AuthEntity} from './auth.entity';
+import {AuthEntity} from './auth.entity';
 
 const ENTITY_PREFIX = 'users';
 export const USERS_ENTITY_OPTIONS = {
@@ -24,15 +24,16 @@ export class UsersEntity extends BaseEntity {
   @PrimaryColumn({type: 'uuid', primaryKeyConstraintName: USERS_ENTITY_OPTIONS.primaryKeyName.id})
   id: string;
 
-  @Column({type: 'varchar', length: 225})
+  @Column({type: 'varchar', length: 100})
   name: string;
 
-  @Column({type: 'number'})
+  @Column({type: 'numeric', nullable: true})
   age: number;
 
-  @OneToOne(() => AuthEntity)
+  @OneToOne(() => AuthEntity, {createForeignKeyConstraints: false})
   @JoinColumn({
     name: 'id',
+
   })
   auth: AuthEntity;
 

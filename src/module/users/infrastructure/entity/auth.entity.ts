@@ -56,4 +56,3 @@ export class AuthEntity extends BaseEntity {
   @DeleteDateColumn({type: 'timestamp', name: 'delete_at', nullable: true})
   deleteAt!: Date;
 }
-
