@@ -10,6 +10,7 @@ WORKDIR /data
 COPY --chown=node:node \
         tsconfig*.json \
         package.json \
+        package-lock.json \
         nest-cli.json \
         ./
 
@@ -29,6 +30,7 @@ WORKDIR /data
 
 COPY --chown=node:node \
         package.json \
+        package-lock.json \
         ./
 
 RUN su-exec node bash -c "npm install --omit=dev"
