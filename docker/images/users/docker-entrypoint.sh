@@ -21,6 +21,8 @@ file_env() {
 
 _main() {
   if [ "$(id -u)" = '0' ]; then
+    sleep 3
+
     exec su-exec node "$BASH_SOURCE" "$@"
   fi
 

@@ -1,8 +1,9 @@
 FROM node:16.16.0-alpine3.16 AS build
 
-RUN apk add --no-cache su-exec; \
+RUN apk add --no-cache curl su-exec bash protoc git; \
     mkdir -p /data /data/src; \
-    chown -R node:node /data
+    chown -R node:node /data; \
+    npm i -g @nestjs/cli
 
 WORKDIR /data
 
@@ -20,7 +21,7 @@ RUN su-exec node sh -c "npm install; npm run build"
 
 FROM node:16.16.0-alpine3.16
 
-RUN apk add --no-cache apache2-utils curl su-exec bash; \
+RUN apk add --no-cache curl su-exec bash protoc git; \
     mkdir -p /data /data/dist /data/storage/tmp; \
     chown -R node:node /data
 
@@ -36,9 +37,7 @@ COPY --from=build --chown=node:node \
         /data/dist \
         ./dist
 
-VOLUME /data/storage/tmp
-
-COPY ./docker/images/node/docker-entrypoint.sh /usr/local/bin/
+COPY ./docker/images/users/docker-entrypoint.sh /usr/local/bin/
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
