@@ -14,7 +14,7 @@ export class UsersModel extends BaseModel<UsersModel> {
   salt: string;
   role: UsersRoleEnum;
   name: string;
-  age: number;
+  age?: number;
   createAt: Date;
   updateAt?: Date;
 
@@ -32,10 +32,9 @@ export class UsersModel extends BaseModel<UsersModel> {
       salt: 'default-salt',
       role: UsersRoleEnum.USER,
       name: 'default-name',
-      age: 0,
       createAt: new Date(),
       [IsDefaultSymbol]: true,
-      [DefaultPropertiesSymbol]: ['id', 'username', 'password', 'salt', 'role', 'name', 'age', 'createAt'],
+      [DefaultPropertiesSymbol]: ['id', 'username', 'password', 'salt', 'role', 'name', 'createAt'],
     }));
   }
 }
