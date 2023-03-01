@@ -14,6 +14,7 @@ import {QueryRunner} from 'typeorm/query-runner/QueryRunner';
 import {EntityManager} from 'typeorm/entity-manager/EntityManager';
 import {UpdateModel} from '@src-utility/model/update.model';
 import {DeleteReadonlyResourceException} from '../../core/exception/delete-readonly-resource.exception';
+import {UpdateReadonlyResourceException} from '../../core/exception/update-readonly-resource.exception';
 
 describe('UsersPgRepository', () => {
   let repository: UsersPgRepository;
@@ -425,15 +426,32 @@ describe('UsersPgRepository', () => {
 
   describe(`update`, () => {
     let inputModel: UpdateModel<UsersModel>;
+    let outputAdminAuthEntity: AuthEntity;
+    let outputAdminUsersEntity: UsersEntity;
     let outputAuthEntity: AuthEntity;
     let outputUsersEntity: UsersEntity;
 
     beforeEach(() => {
       inputModel = new UpdateModel<UsersModel>(identifier.generateId(), {
         password: 'new-password',
+        role: UsersRoleEnum.USER,
         name: 'new-name',
         age: 21,
       });
+
+      outputAdminAuthEntity = new AuthEntity();
+      outputAdminAuthEntity.username = 'admin';
+      outputAdminAuthEntity.password = 'password';
+      outputAdminAuthEntity.salt = 'salt';
+      outputAdminAuthEntity.role = UsersRoleEnum.ADMIN;
+      outputAdminAuthEntity.createAt = defaultDate;
+
+      outputAdminUsersEntity = new UsersEntity();
+      outputAdminUsersEntity.id = identifier.generateId();
+      outputAdminUsersEntity.name = 'admin';
+      outputAdminUsersEntity.age = 20;
+      outputAdminUsersEntity.createAt = defaultDate;
+      outputAdminUsersEntity.updateAt = null;
 
       outputAuthEntity = new AuthEntity();
       outputAuthEntity.username = 'username';
@@ -477,6 +495,19 @@ describe('UsersPgRepository', () => {
       expect(usersDb.findOneBy).toHaveBeenCalledWith({id: inputModel.id});
       expect(error).toBeNull();
       expect(result).toEqual(0);
+    });
+
+    it(`Should error update user when update role of admin user with condition 'username = admin'`, async () => {
+      authDb.findOneBy.mockResolvedValue(outputAdminAuthEntity);
+      usersDb.findOneBy.mockResolvedValue(outputAdminUsersEntity);
+
+      const [error] = await repository.update(inputModel);
+
+      expect(authDb.findOneBy).toHaveBeenCalled();
+      expect(authDb.findOneBy).toHaveBeenCalledWith({id: inputModel.id});
+      expect(usersDb.findOneBy).toHaveBeenCalled();
+      expect(usersDb.findOneBy).toHaveBeenCalledWith({id: inputModel.id});
+      expect(error).toBeInstanceOf(UpdateReadonlyResourceException);
     });
 
     it(`Should error update user when create connection`, async () => {

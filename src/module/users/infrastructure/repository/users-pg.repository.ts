@@ -11,6 +11,7 @@ import {SortEnum} from '@src-utility/model/filter.model';
 import {RepositoryException} from '../../core/exception/repository.exception';
 import {QueryRunner} from 'typeorm/query-runner/QueryRunner';
 import {DeleteReadonlyResourceException} from '../../core/exception/delete-readonly-resource.exception';
+import {UpdateReadonlyResourceException} from '../../core/exception/update-readonly-resource.exception';
 
 export class UsersPgRepository implements GenericRepositoryInterface<UsersModel> {
   constructor(
@@ -120,6 +121,15 @@ export class UsersPgRepository implements GenericRepositoryInterface<UsersModel>
       return [null, 0];
     }
 
+    if (
+      authRow.username === 'admin'
+      && authRow.role === UsersRoleEnum.ADMIN
+      && typeof updateUserModel.role !== 'undefined'
+      && updateUserModel.role !== UsersRoleEnum.ADMIN
+    ) {
+      return [new UpdateReadonlyResourceException()];
+    }
+
     const txOption = {isConnect: false, isTxStart: false};
     const updateState = {shouldUpdateAuth: false, shouldUpdateUser: false};
     const queryRunner = this._dataSource.createQueryRunner();
@@ -133,6 +143,10 @@ export class UsersPgRepository implements GenericRepositoryInterface<UsersModel>
 
       if (typeof updateUserModel.password !== 'undefined') {
         authRow.password = updateUserModel.password;
+        updateState.shouldUpdateAuth = true;
+      }
+      if (typeof updateUserModel.role !== 'undefined') {
+        authRow.role = updateUserModel.role;
         updateState.shouldUpdateAuth = true;
       }
       if (typeof updateUserModel.name !== 'undefined') {
