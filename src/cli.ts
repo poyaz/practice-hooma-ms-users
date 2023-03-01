@@ -8,6 +8,6 @@ async function bootstrap() {
 }
 
 bootstrap().catch((error) => {
-  console.log(error);
+  console.error(error);
   process.exit(1);
 });
