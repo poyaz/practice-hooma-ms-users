@@ -10,6 +10,7 @@ import {NotFoundException} from '../../../module/users/core/exception/not-found.
 import {DeleteReadonlyResourceException} from '../../../module/users/core/exception/delete-readonly-resource.exception';
 
 export enum ExceptionEnum {
+  FORBIDDEN_ERROR = 'FORBIDDEN_ERROR',
   UNPROCESSABLE_ENTITY_ERROR = 'UNPROCESSABLE_ENTITY_ERROR',
   UNKNOWN_ERROR = 'UNKNOWN_ERROR',
 }
@@ -29,6 +30,17 @@ export class GrpcExceptionFilter<T> implements RpcExceptionFilter {
 
       return throwError(() => ({
         code: status.INVALID_ARGUMENT,
+        message: exception.message,
+        metadata: serverMetadata,
+      }));
+    }
+
+    if (exception.message === 'Forbidden resource') {
+      serverMetadata.add('action', ExceptionEnum.FORBIDDEN_ERROR);
+      serverMetadata.add('is-operation', '1');
+
+      return throwError(() => ({
+        code: status.PERMISSION_DENIED,
         message: exception.message,
         metadata: serverMetadata,
       }));

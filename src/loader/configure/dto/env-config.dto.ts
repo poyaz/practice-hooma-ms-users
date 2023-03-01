@@ -21,6 +21,16 @@ export class EnvConfigDto {
   @IsNumber()
   SERVER_GRPC_PORT?: number;
 
+  JWT_ALGORITHM_TYPE?: string;
+
+  @IsDefined()
+  @IsString()
+  JWT_PUBLIC_KEY_FILE: string;
+
+  @IsOptional()
+  @IsString()
+  JWT_EXPIRE_TIME?: string;
+
   @IsOptional()
   @IsString()
   DB_PG_HOST?: string;
