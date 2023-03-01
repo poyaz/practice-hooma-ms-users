@@ -24,7 +24,7 @@ export interface FindOneResponse {
   username: string;
   role: string;
   name: string;
-  age: number;
+  age?: number | undefined;
   createAt: string;
   updateAt: string;
 }
@@ -34,7 +34,7 @@ export interface CreateRequest {
   password: string;
   role: string;
   name: string;
-  age: number;
+  age?: number | undefined;
 }
 
 export interface UpdateRequest {

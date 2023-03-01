@@ -6,6 +6,8 @@ import {
 } from '@nestjs/common';
 import {Observable, throwError} from 'rxjs';
 import {status, Metadata} from '@grpc/grpc-js';
+import {NotFoundException} from '../../../module/users/core/exception/not-found.exception';
+import {DeleteReadonlyResourceException} from '../../../module/users/core/exception/delete-readonly-resource.exception';
 
 export enum ExceptionEnum {
   UNPROCESSABLE_ENTITY_ERROR = 'UNPROCESSABLE_ENTITY_ERROR',
@@ -19,8 +21,11 @@ export class GrpcExceptionFilter<T> implements RpcExceptionFilter {
 
     if (exception instanceof UnprocessableEntityException) {
       serverMetadata.add('action', ExceptionEnum.UNPROCESSABLE_ENTITY_ERROR);
-      serverMetadata.add('isOperation', '1');
-      (<Array<string>><unknown>exception.getResponse()['message'] || []).map((v) => serverMetadata.add('message', v));
+      serverMetadata.add('is-operation', '1');
+
+      const message = <Array<string>><unknown>exception.getResponse()['message'] || [];
+      serverMetadata.add('message-arr-len', message.length.toString());
+      message.map((v, i) => serverMetadata.add(`message-${i}`, v));
 
       return throwError(() => ({
         code: status.INVALID_ARGUMENT,
@@ -29,11 +34,26 @@ export class GrpcExceptionFilter<T> implements RpcExceptionFilter {
       }));
     }
 
+    let isOperation = false;
+    if ('isOperation' in <Error><unknown>exception) {
+      isOperation = exception['isOperation'];
+    }
+
+    if (!isOperation) {
+      console.error(exception);
+    }
+
     serverMetadata.add('action', exception['action'] || ExceptionEnum.UNKNOWN_ERROR);
-    serverMetadata.add('isOperation', 'isOperation' in <Error><unknown>exception ? exception['isOperation'] ? '1' : '0' : '0');
+    serverMetadata.add('is-operation', isOperation ? '1' : '0');
 
     let code;
     switch (true) {
+      case exception instanceof NotFoundException:
+        code = status.NOT_FOUND;
+        break;
+      case exception instanceof DeleteReadonlyResourceException:
+        code = status.PERMISSION_DENIED;
+        break;
       default:
         code = status.UNKNOWN;
     }
