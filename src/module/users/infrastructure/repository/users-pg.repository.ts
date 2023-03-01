@@ -36,7 +36,26 @@ export class UsersPgRepository implements GenericRepositoryInterface<UsersModel>
   }
 
   async getById(id: string): AsyncReturn<Error, UsersModel | null> {
-    return Promise.resolve(undefined);
+    const findOptions: FindManyOptions<UsersEntity> = {
+      relations: [AUTH_ENTITY_OPTIONS.tableName],
+      where: {
+        id,
+      },
+      order: {createAt: SortEnum.DESC},
+    };
+
+    try {
+      const row = await this._usersDb.findOne(findOptions);
+      if (!row) {
+        return [null, null];
+      }
+
+      const result = UsersPgRepository._fillModel(row);
+
+      return [null, result];
+    } catch (error) {
+      return [new RepositoryException(error)];
+    }
   }
 
   async create(model: UsersModel): AsyncReturn<Error, UsersModel> {

@@ -150,4 +150,81 @@ describe('UsersPgRepository', () => {
       expect(total).toEqual(1);
     });
   });
+
+  describe(`getById`, () => {
+    let inputId: string;
+    let outputUsersEntity: UsersEntity;
+
+    beforeEach(() => {
+      inputId = identifier.generateId();
+
+      outputUsersEntity = new UsersEntity();
+      outputUsersEntity.id = identifier.generateId();
+      outputUsersEntity.auth = new AuthEntity();
+      outputUsersEntity.auth.username = 'username';
+      outputUsersEntity.auth.password = 'password';
+      outputUsersEntity.auth.salt = 'salt';
+      outputUsersEntity.auth.role = UsersRoleEnum.USER;
+      outputUsersEntity.auth.createAt = defaultDate;
+      outputUsersEntity.name = 'name';
+      outputUsersEntity.age = 20;
+      outputUsersEntity.createAt = defaultDate;
+      outputUsersEntity.updateAt = null;
+    });
+
+    it(`Should error get user by id`, async () => {
+      const executeError = new Error('Error in create on database');
+      usersDb.findOne.mockRejectedValue(executeError);
+
+      const [error] = await repository.getById(inputId);
+
+      expect(usersDb.findOne).toHaveBeenCalled();
+      expect(usersDb.findOne).toBeCalledWith(expect.objectContaining(<FindManyOptions<UsersEntity>>{
+        relations: [AUTH_ENTITY_OPTIONS.tableName],
+        where: {id: inputId},
+        order: {createAt: SortEnum.DESC},
+      }));
+      expect(error).toBeInstanceOf(RepositoryException);
+      expect((<RepositoryException>error).cause).toEqual(executeError);
+    });
+
+    it(`Should successfully get user by id and return null`, async () => {
+      usersDb.findOne.mockResolvedValue(null);
+
+      const [error, result] = await repository.getById(inputId);
+
+      expect(usersDb.findOne).toHaveBeenCalled();
+      expect(usersDb.findOne).toBeCalledWith(expect.objectContaining(<FindManyOptions<UsersEntity>>{
+        relations: [AUTH_ENTITY_OPTIONS.tableName],
+        where: {id: inputId},
+        order: {createAt: SortEnum.DESC},
+      }));
+      expect(error).toBeNull();
+      expect(result).toBeNull();
+    });
+
+    it(`Should successfully get user by id and return data`, async () => {
+      usersDb.findOne.mockResolvedValue(outputUsersEntity);
+
+      const [error, result] = await repository.getById(inputId);
+
+      expect(usersDb.findOne).toHaveBeenCalled();
+      expect(usersDb.findOne).toBeCalledWith(expect.objectContaining(<FindManyOptions<UsersEntity>>{
+        relations: [AUTH_ENTITY_OPTIONS.tableName],
+        where: {id: inputId},
+        order: {createAt: SortEnum.DESC},
+      }));
+      expect(error).toBeNull();
+      expect(result).toMatchObject<Omit<UsersModel, 'clone' | typeof IsDefaultSymbol | typeof DefaultPropertiesSymbol>>({
+        id: identifier.generateId(),
+        username: outputUsersEntity.auth.username,
+        password: outputUsersEntity.auth.password,
+        salt: outputUsersEntity.auth.salt,
+        role: UsersRoleEnum.USER,
+        name: outputUsersEntity.name,
+        age: outputUsersEntity.age,
+        createAt: defaultDate,
+      });
+    });
+  });
 });
