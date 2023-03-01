@@ -1,6 +1,7 @@
 import {ExceptionEnum} from './enum/exception.enum';
 
 export class RepositoryException extends Error {
+  readonly action: string;
   readonly isOperation: boolean;
   readonly cause: Error;
   readonly combine: Array<Error>;
@@ -8,7 +9,7 @@ export class RepositoryException extends Error {
   constructor(error: Error, parentError?: RepositoryException) {
     super('Repository error!');
 
-    this.name = ExceptionEnum.REPOSITORY_ERROR;
+    this.action = ExceptionEnum.REPOSITORY_ERROR;
     this.isOperation = false;
 
     if (parentError) {
